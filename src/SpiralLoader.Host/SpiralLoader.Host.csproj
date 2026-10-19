@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Headless development host. Boots the loader exactly as the Imlight integration does (discover, resolve,
+    load, initialize, lifecycle events) without needing Imlight, Wizard101 data, or Imcodec type dumps.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>SpiralLoader.Host</AssemblyName>
+    <RootNamespace>SpiralLoader.Host</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SpiralLoader.Runtime\SpiralLoader.Runtime.csproj" />
+  </ItemGroup>
+</Project>

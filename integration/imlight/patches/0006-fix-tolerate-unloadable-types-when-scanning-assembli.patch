@@ -1,0 +1,153 @@
+From 1237b2bafe4da23af01c0356486ccac2f2d291f3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 05:26:14 +0000
+Subject: [PATCH 6/6] fix: tolerate unloadable types when scanning assemblies
+
+The requirement, result and zone component registries scan every loaded
+assembly. One assembly with an unresolvable reference (for example a
+broken plugin) made GetTypes throw inside a static constructor, breaking
+the whole registry. Skip and log the types that cannot load instead.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../Requirements/RequirementDispatcher.cs     |  3 +-
+ .../Game/Results/ResultDispatcher.cs          |  3 +-
+ .../Zone/Core/ZoneEntityComponentRegistry.cs  |  3 +-
+ .../Shared/Utilities/AssemblyTypes.cs         | 62 +++++++++++++++++++
+ 4 files changed, 68 insertions(+), 3 deletions(-)
+ create mode 100644 src/Imlight.CoreLib/Shared/Utilities/AssemblyTypes.cs
+
+diff --git a/src/Imlight.CoreLib/Game/Requirements/RequirementDispatcher.cs b/src/Imlight.CoreLib/Game/Requirements/RequirementDispatcher.cs
+index e283033e..ed6dfb69 100644
+--- a/src/Imlight.CoreLib/Game/Requirements/RequirementDispatcher.cs
++++ b/src/Imlight.CoreLib/Game/Requirements/RequirementDispatcher.cs
+@@ -47,6 +47,7 @@ using System.Linq;
+ using System.Reflection;
+ using Imcodec.ObjectProperty.TypeCache;
+ using Imlight.Common;
++using Imlight.CoreLib.Shared.Utilities;
+ using Type = System.Type;
+ 
+ namespace Imlight.CoreLib.Game.Requirements;
+@@ -165,7 +166,7 @@ public static class RequirementDispatcher {
+         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+ 
+         var handlerTypes = assemblies
+-            .SelectMany(a => a.GetTypes())
++            .SelectMany(AssemblyTypes.LoadableTypes)
+             .Where(t => {
+                 if (!t.IsClass || t.IsAbstract) {
+                     return false;
+diff --git a/src/Imlight.CoreLib/Game/Results/ResultDispatcher.cs b/src/Imlight.CoreLib/Game/Results/ResultDispatcher.cs
+index e74ef2c8..d9ddd984 100644
+--- a/src/Imlight.CoreLib/Game/Results/ResultDispatcher.cs
++++ b/src/Imlight.CoreLib/Game/Results/ResultDispatcher.cs
+@@ -27,6 +27,7 @@ using Imlight.CoreLib.Game.Requirements;
+ using Imlight.CoreLib.Game.Requirements.Contexts;
+ using Imlight.CoreLib.Game.Results.Contexts;
+ using Imlight.CoreLib.Shared.Packets;
++using Imlight.CoreLib.Shared.Utilities;
+ using Imlight.CoreLib.WizardData.Models.Player;
+ using Type = System.Type;
+ 
+@@ -208,7 +209,7 @@ public static class ResultDispatcher {
+         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+ 
+         var handlerTypes = assemblies
+-            .SelectMany(a => a.GetTypes())
++            .SelectMany(AssemblyTypes.LoadableTypes)
+             .Where(t => {
+                 if (!t.IsClass || t.IsAbstract) {
+                     return false;
+diff --git a/src/Imlight.CoreLib/Game/Zone/Core/ZoneEntityComponentRegistry.cs b/src/Imlight.CoreLib/Game/Zone/Core/ZoneEntityComponentRegistry.cs
+index beb1afb5..a4f2f55b 100644
+--- a/src/Imlight.CoreLib/Game/Zone/Core/ZoneEntityComponentRegistry.cs
++++ b/src/Imlight.CoreLib/Game/Zone/Core/ZoneEntityComponentRegistry.cs
+@@ -46,6 +46,7 @@ using System.Linq;
+ using System.Reflection;
+ using Imcodec.ObjectProperty.TypeCache;
+ using Imlight.Common;
++using Imlight.CoreLib.Shared.Utilities;
+ 
+ namespace Imlight.CoreLib.Game.Zone.Core;
+ 
+@@ -73,7 +74,7 @@ internal static class ZoneEntityComponentRegistry {
+     static ZoneEntityComponentRegistry() {
+         var componentTypes = AppDomain.CurrentDomain
+             .GetAssemblies()
+-            .SelectMany(a => a.GetTypes())
++            .SelectMany(AssemblyTypes.LoadableTypes)
+             .Where(t => !t.IsAbstract && 
+                        !t.IsInterface && 
+                        typeof(IComponentFactory).IsAssignableFrom(t) &&
+diff --git a/src/Imlight.CoreLib/Shared/Utilities/AssemblyTypes.cs b/src/Imlight.CoreLib/Shared/Utilities/AssemblyTypes.cs
+new file mode 100644
+index 00000000..26b8af38
+--- /dev/null
++++ b/src/Imlight.CoreLib/Shared/Utilities/AssemblyTypes.cs
+@@ -0,0 +1,62 @@
++/*
++ * Imlight
++ * Copyright (C) 2025 Revive101
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Affero General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Affero General Public License for more details.
++ *
++ * You should have received a copy of the GNU Affero General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ *
++ * ========================================================================
++ * ASSEMBLY TYPES
++ * ========================================================================
++ *
++ * PURPOSE:
++ * Enumerates an assembly's types for the registries that scan every loaded assembly, without letting one
++ * assembly with an unresolvable reference (for example, a broken mod) break the whole scan.
++ *
++ * USAGE EXAMPLE:
++ * AppDomain.CurrentDomain.GetAssemblies().SelectMany(AssemblyTypes.LoadableTypes)
++ *
++ * NOTE:
++ *
++ * TODO:
++ *
++ * Created by: SpiralLoader contributors
++ * Version: KALI 1.0
++ * Last Updated: 10/19/2026
++ */
++
++using System.Collections.Generic;
++using System.Linq;
++using System.Reflection;
++using Imlight.Common;
++
++namespace Imlight.CoreLib.Shared.Utilities;
++
++internal static class AssemblyTypes {
++
++    /// <summary>
++    /// Returns every type of <paramref name="assembly"/> that can be loaded, logging the ones that cannot.
++    /// </summary>
++    public static IEnumerable<System.Type> LoadableTypes(Assembly assembly) {
++        try {
++            return assembly.GetTypes();
++        } catch (ReflectionTypeLoadException ex) {
++            Logger.Warning("Skipped {0} type(s) from {1} that could not be loaded: {2}",
++                Logger.Args(ex.Types.Count(t => t is null), assembly.GetName().Name,
++                    ex.LoaderExceptions.FirstOrDefault()?.Message ?? "unknown error"));
++
++            return ex.Types.Where(t => t is not null);
++        }
++    }
++
++}
+-- 
+2.43.0
+

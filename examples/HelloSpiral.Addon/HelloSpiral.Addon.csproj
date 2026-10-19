@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\build\SpiralLoader.Mod.props" />
+  <PropertyGroup>
+    <SpiralModId>hello-spiral-addon</SpiralModId>
+    <AssemblyName>HelloSpiral.Addon</AssemblyName>
+    <RootNamespace>HelloSpiral.Addon</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SpiralLoader.Api\SpiralLoader.Api.csproj" Private="false" />
+    <!-- Compile against hello-spiral but do not ship it: at runtime its types come from the hello-spiral mod. -->
+    <ProjectReference Include="..\HelloSpiral\HelloSpiral.csproj" Private="false" />
+  </ItemGroup>
+  <Import Project="..\..\build\SpiralLoader.Mod.targets" />
+</Project>

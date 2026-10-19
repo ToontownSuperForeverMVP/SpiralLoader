@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "hello-spiral-addon",
+  "version": "1.0.0",
+  "name": "Hello Spiral Addon",
+  "description": "Example mod that depends on hello-spiral and uses its public types.",
+  "authors": ["SpiralLoader contributors"],
+  "entrypoints": {
+    "server": ["HelloSpiral.Addon.AddonMod"]
+  },
+  "assemblies": ["HelloSpiral.Addon.dll"],
+  "depends": {
+    "spiralloader": ">=0.1.0 <0.2.0",
+    "hello-spiral": "^1.0.0"
+  }
+}
