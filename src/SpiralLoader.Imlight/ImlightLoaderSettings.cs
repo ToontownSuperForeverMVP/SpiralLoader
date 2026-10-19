@@ -86,12 +86,12 @@ public sealed class ImlightLoaderSettings {
             FailurePolicy = Choose("FailurePolicy", defaults.FailurePolicy, text => text.ToLowerInvariant() switch {
                 "abort" or "abortstartup" => ModFailurePolicy.AbortStartup,
                 "continue" or "continuewithoutfailedmods" => ModFailurePolicy.ContinueWithoutFailedMods,
-                _ => (ModFailurePolicy?) null,
+                _ => (ModFailurePolicy?)null,
             }),
             CompatibilityMode = Choose("CompatibilityMode", defaults.CompatibilityMode, text => text.ToLowerInvariant() switch {
                 "strict" => CompatibilityMode.Strict,
                 "warnonly" or "warn" => CompatibilityMode.WarnOnly,
-                _ => (CompatibilityMode?) null,
+                _ => (CompatibilityMode?)null,
             }),
             DisabledMods = (Get("DisabledMods") ?? string.Empty)
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),

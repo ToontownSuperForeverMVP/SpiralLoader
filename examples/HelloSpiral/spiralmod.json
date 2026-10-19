@@ -5,7 +5,6 @@
   "name": "Hello Spiral",
   "description": "Example mod: lifecycle events, a command, a public API for other mods, and a declared Lua asset.",
   "authors": ["SpiralLoader contributors"],
-  "license": "AGPL-3.0-or-later",
   "entrypoints": {
     "server": ["HelloSpiral.HelloSpiralMod"]
   },

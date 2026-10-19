@@ -129,11 +129,11 @@ public sealed class ModWorkspace : IDisposable {
 public static class TestCompiler {
 
     private static readonly Lazy<List<MetadataReference>> s_frameworkReferences = new(() => {
-        var tpa = (string) AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!;
+        var tpa = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!;
         return tpa.Split(System.IO.Path.PathSeparator)
             .Where(path => System.IO.Path.GetFileName(path).StartsWith("System.", StringComparison.Ordinal)
                            || System.IO.Path.GetFileName(path) is "mscorlib.dll" or "netstandard.dll" or "Microsoft.Win32.Primitives.dll")
-            .Select(path => (MetadataReference) MetadataReference.CreateFromFile(path))
+            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
             .Append(MetadataReference.CreateFromFile(typeof(ISpiralMod).Assembly.Location))
             .ToList();
     });

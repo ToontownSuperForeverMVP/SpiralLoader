@@ -240,7 +240,9 @@ public sealed class ResolutionTests : IDisposable {
     [Fact]
     public void RejectsMissingDeclaredAssembly() {
         _workspace.AddManifest("hollow", new {
-            schemaVersion = 1, id = "hollow", version = "1.0.0",
+            schemaVersion = 1,
+            id = "hollow",
+            version = "1.0.0",
             assemblies = new[] { "Hollow.dll" },
             entrypoints = new { server = "Hollow.Mod" },
         });

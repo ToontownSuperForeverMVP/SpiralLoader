@@ -5,7 +5,6 @@
   "name": "Hello Spiral Addon",
   "description": "Example mod that depends on hello-spiral and uses its public types.",
   "authors": ["SpiralLoader contributors"],
-  "license": "AGPL-3.0-or-later",
   "entrypoints": {
     "server": ["HelloSpiral.Addon.AddonMod"]
   },
