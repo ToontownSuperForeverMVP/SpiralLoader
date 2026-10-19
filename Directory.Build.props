@@ -1,0 +1,18 @@
+<Project>
+  <!-- Shared settings for every SpiralLoader project. Example mods and tests import this too. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <Deterministic>true</Deterministic>
+    <SpiralLoaderRepoRoot>$(MSBuildThisFileDirectory)</SpiralLoaderRepoRoot>
+    <SpiralLoaderVersion>0.1.0</SpiralLoaderVersion>
+    <Version>$(SpiralLoaderVersion)</Version>
+    <Authors>SpiralLoader contributors</Authors>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+</Project>

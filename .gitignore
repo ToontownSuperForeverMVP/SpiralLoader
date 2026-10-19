@@ -1,0 +1,13 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+TestResults/
+artifacts/
+# Local Imlight checkouts used for integration builds. Never commit Wizard101 data.
+external/
+*.wad
+LatestFileList.*

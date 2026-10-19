@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Tests intentionally exercise obsolete/edge paths; keep warnings visible but not fatal here. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <!-- Compiles throwaway mods at test time, so failure cases use real assemblies. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SpiralLoader.Runtime\SpiralLoader.Runtime.csproj" />
+    <!--
+      Build-order-only references: the example mods and the headless host are built (and the mods assembled
+      into artifacts/mods) before the tests run, but the tests never reference their assemblies. That is the
+      point: they are discovered and loaded at runtime like third-party mods.
+    -->
+    <ProjectReference Include="..\..\examples\HelloSpiral\HelloSpiral.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\examples\HelloSpiral.Addon\HelloSpiral.Addon.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\SpiralLoader.Host\SpiralLoader.Host.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ExampleModsDirectory</_Parameter1>
+      <_Parameter2>$(SpiralLoaderRepoRoot)artifacts/mods</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>HeadlessHostPath</_Parameter1>
+      <_Parameter2>$(SpiralLoaderRepoRoot)src/SpiralLoader.Host/bin/$(Configuration)/net10.0/SpiralLoader.Host.dll</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>
