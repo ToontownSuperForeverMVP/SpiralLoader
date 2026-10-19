@@ -109,7 +109,9 @@ Host-agnostic lifecycle events: `ModsLoadedEvent`, `ServerStartingEvent`, `Serve
 the contributing mod (`modid:name`). The host declares registries before `Load()` and may attach a validator
 (for example "must derive from `MessageService` with a `SessionActor` constructor"); a rejected value throws in
 the mod's `Initialize`, which fails and rolls back that mod. Entries are ordered by mod load order, then
-registration order. Registries freeze with the bus.
+registration order. Registries freeze with the bus. A host may declare a registry with `uniqueValues: true`
+for claims (ids the host reserves): a value can then be registered once across all mods, and a duplicate
+throws in the second mod's `Initialize` (reported as `init.failed`, naming the entry that holds the value).
 
 Declared today:
 
@@ -118,6 +120,7 @@ Declared today:
 | `spiralloader:commands` | `ModCommand` | Headless host `--run`; Imlight `CommandDispatcher` fallback |
 | `imlight:game_message_services` | `Type` | `GameServiceFactory` |
 | `imlight:login_message_services` | `Type` | `LoginServiceFactory` |
+| `imlight:client_process_jobs` | `uint` (unique, non-zero) | `MinigameService`, `ProcessSupervisor` via `ImlightModding.IsClientProcessJobClaimed` |
 
 ## Manifest (`spiralmod.json`, schema 1)
 

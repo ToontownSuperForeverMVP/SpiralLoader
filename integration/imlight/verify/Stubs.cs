@@ -7,6 +7,8 @@ using System.Linq;
 using Akka.Actor;
 using Imlight.CoreLib.Game;
 using Imlight.CoreLib.Login;
+using Imcodec.MessageLayer;
+using Imcodec.MessageLayer.Generated;
 using Imlight.CoreLib.Shared.Packets;
 
 namespace Imcodec.ObjectProperty.TypeCache {
@@ -17,11 +19,37 @@ namespace Imcodec.ObjectProperty.TypeCache {
 }
 
 namespace Imlight.CoreLib.Shared.Networking {
-    public sealed class SessionActor : ReceiveActor { }
+    // The real SessionActor owns a socket. This one only records what services send to "the client" and routes
+    // server asks to ServerRef, which is all the services under test use.
+    public sealed class SessionActor {
+        public IActorRef ActorRef { get; init; }
+        public IActorRef ServerRef { get; init; }
+        public int SessionID { get; init; } = 1;
+        public IMessage CachedDequeueMessage { get; set; }
+
+        public IMessage EnqueueToServer(IActorRef gameServer) => new LOGIN_7_PROTOCOL.MSG_CHARACTERSELECTED { PrepPhase = 0 };
+
+        public T AskServer<T>(IServerMessage message) where T : IServerMessage => ServerRef.Ask<T>(message).Result;
+    }
+
+    public sealed class SessionFatalException(string message) : Exception(message);
 
     // Internal in Imlight. Public here only so the verification mod can derive from it without a publicizer.
-    public abstract class MessageService(SessionActor sessionActor) : ReceiveActor {
+    // Derives from Imlight's real ReceiveProtocolDispatcher, so [MessageHandler] dispatch is the real thing.
+    public abstract class MessageService(SessionActor sessionActor) : ReceiveProtocolDispatcher {
         protected SessionActor SessionActor { get; } = sessionActor;
+
+        protected void SendToSocket(IMessage message) => SessionActor.ActorRef.Tell(message);
+
+        protected T AskServer<T>(IServerMessage message) where T : IServerMessage => SessionActor.AskServer<T>(message);
+
+        protected Imlight.CoreLib.WizardData.Models.Player.Account GetSocketAccount() => ScenarioWorld.AccountOf(SessionActor);
+
+        protected void CloseSession() => SessionActor.ActorRef.Tell("Close");
+
+        protected Imlight.CoreLib.WizardData.Models.Player.Wizard GetActiveWizard() => throw new NotSupportedException("not used by the scenarios");
+
+        protected void Teleport(string destinationZone, string destinationLocation, bool makePrivate) => throw new NotSupportedException("not used by the scenarios");
     }
 
     public static class Server {
@@ -55,7 +83,6 @@ namespace Imlight.CoreLib.Game.Services {
     internal sealed class CantripService(SessionActor s) : MessageService(s) { }
     internal sealed class TrainService(SessionActor s) : MessageService(s) { }
     internal sealed class PetService(SessionActor s) : MessageService(s) { }
-    internal sealed class MinigameService(SessionActor s) : MessageService(s) { }
     internal sealed class FriendsService(SessionActor s) : MessageService(s) { }
     internal sealed class GroupService(SessionActor s) : MessageService(s) { }
     internal sealed class TutorialService(SessionActor s) : MessageService(s) { }
@@ -68,24 +95,7 @@ namespace Imlight.CoreLib.Game.Services {
 namespace Imlight.CoreLib.Login.Services {
     using Imlight.CoreLib.Shared.Networking;
     internal sealed class AuthenticatorService(SessionActor s) : MessageService(s) { }
-    internal sealed class CharacterService(SessionActor s) : MessageService(s) { }
-    internal sealed class GameTransitionService(SessionActor s) : MessageService(s) { }
     internal sealed class LoginAFKService(SessionActor s) : MessageService(s) { }
-}
-
-namespace Imlight.CoreLib.Shared.Packets {
-    public static class SERVICE_101_PROTOCOL {
-        public sealed class MSG_QUERYUNLOADEDSERVICES { }
-        public sealed class MSG_SERVICESLIST { public List<System.Type> Services; }
-    }
-
-    public static class SERVER_100_PROTOCOL {
-        public sealed class MSG_CREATEGAMESERVER { public string Name; public ushort Port; public string RealmName; }
-        public sealed class MSG_INITIALIZE { }
-        public sealed class MSG_INITIALIZE_COMPLETE { }
-        public sealed class MSG_STARTLISTENING { }
-        public sealed class MSG_STARTLISTENING_COMPLETE { }
-    }
 }
 
 namespace Imlight.CoreLib.Shared.Resources {
@@ -127,11 +137,17 @@ namespace Imlight.CoreLib.Login {
             public StubLoginServer() {
                 var login = Context.ActorOf(LoginServiceFactory.Props(), "loginServiceFactory");
                 Report("login", login);
+                HookScenarios.Run(Context.System);
                 Receive<SERVER_100_PROTOCOL.MSG_CREATEGAMESERVER>(message => {
                     var game = Context.ActorOf(GameServiceFactory.Props(), $"gameServiceFactory-{message.Port}");
                     Report($"game {message.RealmName}", game);
                 });
-                Receive<SERVER_100_PROTOCOL.MSG_STARTLISTENING>(_ => Sender.Tell(new SERVER_100_PROTOCOL.MSG_STARTLISTENING_COMPLETE()));
+                // MSG_STARTLISTENING exists only in newer Imlight (the quality-assurance Director sends it), so match by name.
+                ReceiveAny(message => {
+                    if (message.GetType().Name == "MSG_STARTLISTENING") {
+                        Sender.Tell(Activator.CreateInstance(typeof(SERVER_100_PROTOCOL).GetNestedType("MSG_STARTLISTENING_COMPLETE")));
+                    }
+                });
             }
 
             private static void Report(string label, IActorRef factory) {
@@ -171,11 +187,30 @@ namespace Imlight.CoreLib.WizardData.Models.Player {
     public enum AuthLevel { None, QualityAssurance, HallMonitor, Developer, Administrator }
 
     public class Account {
+        public Account() { }
+        public Account(string username, ulong accountId) { Username = username; AccountId = accountId; }
         public string Username { get; private set; }
+        public ulong AccountId { get; private set; }
         public AuthLevel AuthLevel { get; set; }
+        public int PurchasedCharacterSlots { get; set; } = 2;
+        public List<Wizard> Characters = new();
+        public bool AddCharacter(Wizard character) { Characters.Add(character); return true; }
+        public bool DeleteCharacter(ulong id) => Characters.RemoveAll(c => c.CharId == id) > 0;
+        public Wizard GetCharacter(ulong id) => Characters.FirstOrDefault(c => c.CharId == id);
     }
 
-    public class Wizard { }
+    public class Wizard {
+        public ulong CharId { get; set; }
+        public ulong GameObjectID => CharId;
+        public string Name { get; set; } = "Test Wizard";
+        public string Zone { get; set; } = "WizardCity/WC_Ravenwood";
+        public string PreviousZone { get; set; }
+        public Imcodec.Math.Vector3 Location { get; set; }
+        public Imcodec.Math.Vector3 Orientation { get; set; }
+        public NameBehavior PlayerNameBehavior => new(Name);
+
+        public sealed class NameBehavior(string name) { public string GetWizardName() => name; }
+    }
 }
 
 namespace Imlight.CoreLib.WizardData.Models.World {

@@ -40,3 +40,14 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./integration/imlight/verify/Verify-Patch.ps1
+
+      - name: Verify Imlight patches (audited upstream quality-assurance commit)
+        if: runner.os == 'Linux'
+        env:
+          IMLIGHT_COMMIT: 2a16010e59b95cc449d8e21542fbf38440e06bcf
+        run: integration/imlight/verify/verify-patch.sh
+
+      - name: Verify Imlight patches (audited upstream quality-assurance commit)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./integration/imlight/verify/Verify-Patch.ps1 -Commit 2a16010e59b95cc449d8e21542fbf38440e06bcf

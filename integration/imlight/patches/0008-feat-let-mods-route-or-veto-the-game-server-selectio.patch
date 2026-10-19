@@ -1,0 +1,139 @@
+From fd2db187e2fd76028e5a98068f4e0454898b3af2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 16:48:08 +0000
+Subject: [PATCH 08/10] feat: let mods route or veto the game server selection
+
+GameServerSelectingEvent lets mods choose the realm a player is sent to
+or cancel the transition. Imlight's own best-server choice is used when
+nothing subscribes or no realm is chosen.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01KwY3gt2sftPqYBZDyye7ge
+---
+ .../Login/Services/GameTransitionService.cs   | 56 +++++++++++++++++++
+ src/Imlight.CoreLib/Modding/ImlightEvents.cs  | 23 ++++++++
+ 2 files changed, 79 insertions(+)
+
+diff --git a/src/Imlight.CoreLib/Login/Services/GameTransitionService.cs b/src/Imlight.CoreLib/Login/Services/GameTransitionService.cs
+index 5e4b3e36..014acb6d 100644
+--- a/src/Imlight.CoreLib/Login/Services/GameTransitionService.cs
++++ b/src/Imlight.CoreLib/Login/Services/GameTransitionService.cs
+@@ -42,6 +42,7 @@ using Imcodec.Math;
+ using Imcodec.MessageLayer.Generated;
+ using Imcodec.Types;
+ using Imlight.Common;
++using Imlight.CoreLib.Modding;
+ using Imlight.CoreLib.Shared.Networking;
+ using Imlight.CoreLib.Shared.Packets;
+ using Imlight.CoreLib.Shared.Resources;
+@@ -87,6 +88,13 @@ internal class GameTransitionService(SessionActor sessionActor) : MessageService
+             return;
+         }
+ 
++        // Mods may route the player to a realm or veto the transition.
++        if (!TrySelectModGameServer(account, character)) {
++            SendErrorToSocket();
++
++            return;
++        }
++
+         // Enqueue the session actor onto the game server and create a session key.
+         var gameServer = GetGameServer();
+         var serverEnqueueResult = (LOGIN_7_PROTOCOL.MSG_CHARACTERSELECTED) SessionActor.EnqueueToServer(gameServer.ActorRef);
+@@ -128,7 +136,55 @@ internal class GameTransitionService(SessionActor sessionActor) : MessageService
+         }
+     }
+ 
++    // Set by TrySelectModGameServer when a mod chose the realm; consumed once by GetGameServer.
++    private SERVER_100_PROTOCOL.MSG_SERVERINFO _modGameServer;
++
++    /// <summary>
++    /// Publishes <see cref="GameServerSelectingEvent"/>. Returns false when a mod vetoed the transition or chose a
++    /// realm that has no game server. A chosen realm is remembered for <see cref="GetGameServer"/>.
++    /// </summary>
++    private bool TrySelectModGameServer(Account account, Wizard character) {
++        if (!ImlightModding.Events.HasSubscribers<GameServerSelectingEvent>()) {
++            return true;
++        }
++
++        var selecting = new GameServerSelectingEvent(account, character);
++        ImlightModding.Events.Publish(selecting);
++
++        if (selecting.IsCancelled) {
++            Logger.Information("A mod cancelled the game server selection of account {accountUsername}.",
++                Logger.Args(account.Username));
++
++            return false;
++        }
++
++        if (string.IsNullOrEmpty(selecting.RealmName)) {
++            return true;
++        }
++
++        var msg = new SERVER_100_PROTOCOL.MSG_QUERYREALMSERVER() { RealmName = selecting.RealmName };
++        var realmServer = AskServer<SERVER_100_PROTOCOL.MSG_SERVERINFO>(msg);
++        if (realmServer?.RealmName is null) {
++            Logger.Error("A mod routed account {accountUsername} to realm {realm}, but no such game server is available.",
++                Logger.Args(account.Username, selecting.RealmName));
++
++            return false;
++        }
++
++        _modGameServer = realmServer;
++
++        return true;
++    }
++
+     private SERVER_100_PROTOCOL.MSG_SERVERINFO GetGameServer() {
++        // A mod chose the realm (see TrySelectModGameServer).
++        if (_modGameServer is not null) {
++            var chosen = _modGameServer;
++            _modGameServer = null;
++
++            return chosen;
++        }
++
+         var msg = new SERVER_100_PROTOCOL.MSG_GETBESTSERVER();
+         
+         return AskServer<SERVER_100_PROTOCOL.MSG_SERVERINFO>(msg);
+diff --git a/src/Imlight.CoreLib/Modding/ImlightEvents.cs b/src/Imlight.CoreLib/Modding/ImlightEvents.cs
+index 1df14387..5b11dd24 100644
+--- a/src/Imlight.CoreLib/Modding/ImlightEvents.cs
++++ b/src/Imlight.CoreLib/Modding/ImlightEvents.cs
+@@ -41,6 +41,7 @@ using Akka.Actor;
+ using Imcodec.MessageLayer;
+ using Imlight.CoreLib.WizardData.Models.Player;
+ using Imlight.CoreLib.WizardData.Models.World;
++using SpiralLoader.Api.Events;
+ 
+ namespace Imlight.CoreLib.Modding;
+ 
+@@ -81,3 +82,25 @@ public sealed class CharacterListSentEvent(Account account, Action<IMessage> sen
+     }
+ 
+ }
++
++/// <summary>
++/// Published by the login server's <c>GameTransitionService</c> when a player has selected a character and
++/// Imlight is about to choose the game server (realm) to send them to. Set <see cref="RealmName"/> to route the
++/// player to a specific realm. <see cref="CancellableEvent.Cancel"/> rejects the transition: the client receives
++/// an error and the session closes.
++/// </summary>
++public sealed class GameServerSelectingEvent(Account account, Wizard character) : CancellableEvent {
++
++    /// <summary>The account selecting a character.</summary>
++    public Account Account { get; } = account;
++
++    /// <summary>The selected character.</summary>
++    public Wizard Character { get; } = character;
++
++    /// <summary>
++    /// The realm to send the player to, matching the realm name of a configured game server exactly. Null or empty
++    /// (the default) keeps Imlight's own choice. A realm that does not exist rejects the transition and is logged.
++    /// </summary>
++    public string RealmName { get; set; }
++
++}
+-- 
+2.43.0
+

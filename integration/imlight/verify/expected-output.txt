@@ -1,0 +1,20 @@
+SpiralLoader 0.1.0 starting (host: Imlight
+2 mod(s) found, 2 initialized, 0 failed.
+[hello-spiral] Hello from Hello Spiral 1.0.0 on Imlight.
+VERIFY: event ServerStarting Imlight
+VERIFY: SpiralDB.Load
+VERIFY: event ServerResourcesLoaded
+VERIFY: login services=6 mod=[]
+mod=[ImlightVerifyMod.VerifyService]
+Mod imlight-verify added message service ImlightVerifyMod.VerifyService
+Imlight may now be connected to.
+VERIFY: event ServerStarted
+VERIFY: scenario claims 770101=True 770102=True 424242=False
+VERIFY: event CharacterListSent menu-user
+VERIFY: scenario character-list menu-user socket=[MSG_STARTCHARACTERLIST,MSG_CHARACTERINFO,MSG_CHARACTERLIST(error=0),MSG_START_CLIENT_PROCESS(770101,Verify/Menu.lua)]
+VERIFY: scenario character-list plain-user socket=[MSG_STARTCHARACTERLIST,MSG_CHARACTERINFO,MSG_CHARACTERLIST(error=0)]
+VERIFY: scenario select default-user server-asks=[MSG_GETBESTSERVER,MSG_CREATEKEY] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=0,port=12000)]
+VERIFY: scenario select route-user server-asks=[MSG_QUERYREALMSERVER(Shuffle),MSG_CREATEKEY] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=0,port=13000)]
+VERIFY: scenario select veto-user server-asks=[] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=1,port=0)]
+VERIFY: scenario select unknown-realm-user server-asks=[MSG_QUERYREALMSERVER(Nowhere)] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=1,port=0)]
+VERIFY: scenario minigame decodes=1
