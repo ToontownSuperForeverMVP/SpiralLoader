@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "imlight-verify",
+  "version": "1.0.0",
+  "name": "Imlight Patch Verification",
+  "entrypoints": { "server": ["ImlightVerifyMod.VerifyMod"] },
+  "assemblies": ["ImlightVerifyMod.dll"],
+  "depends": { "spiralloader": ">=0.1.0", "imlight": "^1.0.0" }
+}

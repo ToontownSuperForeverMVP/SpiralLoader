@@ -174,9 +174,11 @@ public sealed class EventAndRegistryTests {
         RegistryEntry<ModCommand> Entry(string owner, string reply) => new($"{owner}:greet", owner, new ModCommand("greet", "", i => reply + string.Join(' ', i.Arguments)));
         var router = new ModCommandRouter([Entry("early", "early "), Entry("late", "late ")], new SinkLogger("spiralloader", log, ModLogLevel.Trace));
 
-        Assert.True(router.TryExecute("GREET a b", "tester", out var reply));
+        Assert.True(router.TryExecute("GREET a b", "tester", callerIsOperator: true, out var reply));
         Assert.Equal("early a b", reply);
-        Assert.False(router.TryExecute("unknown", "tester", out _));
+        Assert.True(router.TryExecute("greet a b", "player", callerIsOperator: false, out var refusal));
+        Assert.Contains("permission", refusal);
+        Assert.False(router.TryExecute("unknown", "tester", callerIsOperator: true, out _));
         Assert.Contains(log.Entries, e => e.Message.Contains("'late'"));
         Assert.NotNull(ModCommandRouter.Validate(new ModCommand("Has Space", "", _ => null)));
         Assert.Null(ModCommandRouter.Validate(new ModCommand("ok-name", "", _ => null)));

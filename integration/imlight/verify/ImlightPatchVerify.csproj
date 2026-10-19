@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Imlight patch verification harness. Compiles the REAL patched Imlight Director Program.cs and the new or
+    changed CoreLib files that do not need Imcodec, against functional stubs for everything that does, then
+    runs Program.Main. This proves, without Wizard101 data or Imcodec type dumps, that the patched Director
+    boots SpiralLoader, routes its logs through Imlight's Logger, publishes lifecycle events, and merges
+    mod-registered message services into Imlight's service factories.
+
+    It does NOT prove that the patched Imlight.CoreLib compiles as a whole (call sites in LootGranter and
+    CommandDispatcher are not compiled here). That requires a local build with the Imcodec type dump.
+
+    Usage: integration/imlight/verify/verify-patch.sh (or Verify-Patch.ps1).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Imlight.Director.Verify</AssemblyName>
+    <RootNamespace>Imlight.Director</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ImlightSourceRoot Condition="'$(ImlightSourceRoot)' == ''">$(SpiralLoaderRepoRoot)external/Imlight/</ImlightSourceRoot>
+    <!-- ImlightSourceRoot may be a global (command-line) property, which cannot be reassigned here. -->
+    <_Imlight>$([MSBuild]::EnsureTrailingSlash('$(ImlightSourceRoot)'))src/</_Imlight>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Stubs.cs" />
+    <Compile Include="$(_Imlight)Imlight.Director/Program.cs" />
+    <Compile Include="$(_Imlight)Imlight.Director/AkkaConfiguration.cs" />
+    <Compile Include="$(_Imlight)Imlight.Director/ResourceContainer.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Modding/ImlightModding.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Modding/ImlightEvents.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Utilities/AssemblyTypes.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Game/Zone/Core/ZoneEntityComponentRegistry.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Game/GameServiceFactory.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Login/LoginServiceFactory.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/ServiceFactory.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Akka" Version="1.5.33" />
+    <ProjectReference Include="$(_Imlight)Imlight.Common/Imlight.Common.csproj" />
+    <ProjectReference Include="$(SpiralLoaderRepoRoot)src/SpiralLoader.Imlight/SpiralLoader.Imlight.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(_Imlight)Imlight.Director/Config/Imlight.ini" Link="Config/Imlight.ini" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="akka.conf" Link="Config/akka.conf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="VerifyImlightCheckout" BeforeTargets="ResolveProjectReferences">
+    <Error Condition="!Exists('$(_Imlight)Imlight.CoreLib/Modding/ImlightModding.cs')"
+           Text="No patched Imlight checkout at '$(ImlightSourceRoot)'. Run integration/imlight/setup-imlight.sh (or pass -p:ImlightSourceRoot=...)." />
+  </Target>
+</Project>

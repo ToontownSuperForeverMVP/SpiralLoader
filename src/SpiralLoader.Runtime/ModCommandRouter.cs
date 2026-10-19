@@ -27,14 +27,21 @@ public sealed partial class ModCommandRouter {
 
     public IReadOnlyCollection<RegistryEntry<ModCommand>> Commands => _commands.Values;
 
-    /// <summary>Runs <paramref name="commandLine"/>. Returns false if no mod registered its command word.</summary>
-    public bool TryExecute(string commandLine, string caller, out string? reply) {
+    /// <summary>
+    /// Runs <paramref name="commandLine"/>. Returns false if no mod registered its command word. A caller without
+    /// operator rights gets a refusal reply for <see cref="ModCommand.OperatorOnly"/> commands.
+    /// </summary>
+    public bool TryExecute(string commandLine, string caller, bool callerIsOperator, out string? reply) {
         reply = null;
         var parts = commandLine.Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0 || !_commands.TryGetValue(parts[0], out var entry)) {
             return false;
         }
-        reply = entry.Value.Execute(new ModCommandInvocation(parts[1..], caller));
+        if (entry.Value.OperatorOnly && !callerIsOperator) {
+            reply = "You do not have permission to use this command.";
+            return true;
+        }
+        reply = entry.Value.Execute(new ModCommandInvocation(parts[1..], caller, callerIsOperator));
         return true;
     }
 

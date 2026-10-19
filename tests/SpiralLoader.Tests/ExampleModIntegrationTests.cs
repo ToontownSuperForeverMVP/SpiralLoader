@@ -37,7 +37,7 @@ public sealed class ExampleModIntegrationTests {
 
         Assert.Equal(["hello-spiral", "hello-spiral-addon"], report.LoadOrder);
         var router = new ModCommandRouter(host.Registries.Get(CommonRegistries.Commands).Entries, host.Logger);
-        Assert.True(router.TryExecute("hello Merle", "tester", out var reply));
+        Assert.True(router.TryExecute("hello Merle", "tester", callerIsOperator: true, out var reply));
         Assert.Equal("Hello, Merle! Welcome to the Spiral. (addon was here)", reply);
         Assert.True(File.Exists(Path.Combine(workspace.DataRoot, "default", "hello-spiral", "started.txt")));
 
