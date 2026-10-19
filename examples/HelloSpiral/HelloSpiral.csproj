@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\build\SpiralLoader.Mod.props" />
+  <PropertyGroup>
+    <SpiralModId>hello-spiral</SpiralModId>
+    <AssemblyName>HelloSpiral</AssemblyName>
+    <RootNamespace>HelloSpiral</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Private=false: the host provides SpiralLoader.Api at runtime. -->
+    <ProjectReference Include="..\..\src\SpiralLoader.Api\SpiralLoader.Api.csproj" Private="false" />
+  </ItemGroup>
+  <Import Project="..\..\build\SpiralLoader.Mod.targets" />
+</Project>

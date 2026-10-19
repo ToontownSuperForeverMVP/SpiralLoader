@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Imlight host bootstrap. Deliberately has no reference to any Imlight assembly: Imlight passes its
+    configuration section, version identity and a log writer in, so this project builds and is tested without
+    Imlight, Imcodec or proprietary Wizard101 type dumps. The few lines that touch Imlight types live in the
+    Imlight integration patch (integration/imlight/patches).
+  -->
+  <PropertyGroup>
+    <RootNamespace>SpiralLoader.Imlight</RootNamespace>
+    <AssemblyName>SpiralLoader.Imlight</AssemblyName>
+    <Description>Boots SpiralLoader inside the Imlight server.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SpiralLoader.Runtime\SpiralLoader.Runtime.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SpiralLoader.Tests" />
+  </ItemGroup>
+</Project>

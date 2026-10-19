@@ -1,0 +1,39 @@
+<Project>
+  <!-- Import after the SDK targets (or at the end of the project file). See SpiralLoader.Mod.props. -->
+  <ItemGroup Condition="'$(SpiralLoaderApiPath)' != ''">
+    <Reference Include="SpiralLoader.Api">
+      <HintPath>$(SpiralLoaderApiPath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ImlightDirectory)' != ''">
+    <Reference Include="$(ImlightDirectory)/Imlight.CoreLib.dll" Private="false" />
+    <Reference Include="$(ImlightDirectory)/Imlight.Common.dll" Private="false" />
+    <Reference Include="$(ImlightDirectory)/Akka.dll" Private="false" />
+    <Reference Include="$(ImlightDirectory)/Imcodec.*.dll" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="spiralmod.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('spiralmod.json')" />
+    <None Include="assets/**/*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="SpiralModValidateProperties" BeforeTargets="Build">
+    <Error Condition="'$(SpiralModId)' == ''" Text="Set the SpiralModId property to the mod id from spiralmod.json." />
+    <Error Condition="!Exists('spiralmod.json')" Text="A SpiralLoader mod project needs a spiralmod.json next to the project file." />
+  </Target>
+
+  <!-- Assemble an installable mod folder: copy the build output (minus host-provided assemblies). -->
+  <Target Name="SpiralModAssemble" AfterTargets="Build" Condition="'$(SpiralModId)' != ''">
+    <PropertyGroup>
+      <_SpiralModFolder>$([MSBuild]::EnsureTrailingSlash('$(SpiralModOutputRoot)'))$(SpiralModId)/</_SpiralModFolder>
+    </PropertyGroup>
+    <ItemGroup>
+      <_SpiralModFiles Include="$(OutDir)**/*" Exclude="$(OutDir)SpiralLoader.Api.*;$(OutDir)**/*.pdb.tmp" />
+    </ItemGroup>
+    <RemoveDir Directories="$(_SpiralModFolder)" />
+    <Copy SourceFiles="@(_SpiralModFiles)" DestinationFiles="@(_SpiralModFiles->'$(_SpiralModFolder)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" />
+    <Message Importance="high" Text="SpiralLoader mod '$(SpiralModId)' -> $(_SpiralModFolder)" />
+  </Target>
+</Project>

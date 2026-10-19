@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- A mod built against the verification harness: registers a game message service and subscribes to events. -->
+  <Import Project="$(SpiralLoaderRepoRoot)build/SpiralLoader.Mod.props" />
+  <PropertyGroup>
+    <SpiralModId>imlight-verify</SpiralModId>
+    <AssemblyName>ImlightVerifyMod</AssemblyName>
+    <SpiralModOutputRoot>$(MSBuildThisFileDirectory)../bin/mods/</SpiralModOutputRoot>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Upstream Imlight.Common pins Akka.Remote 1.5.0 (advisory GHSA-jhpv-4q4f-43g5); not ours to fix here. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SpiralLoaderRepoRoot)src/SpiralLoader.Api/SpiralLoader.Api.csproj" Private="false" />
+    <ProjectReference Include="../ImlightPatchVerify.csproj" Private="false" />
+  </ItemGroup>
+  <Import Project="$(SpiralLoaderRepoRoot)build/SpiralLoader.Mod.targets" />
+</Project>

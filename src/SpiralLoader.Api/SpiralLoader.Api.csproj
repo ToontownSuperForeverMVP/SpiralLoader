@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Public mod API. Mods compile against this assembly; the host always provides it at runtime,
+    so mods must reference it with Private=false (see build/SpiralLoader.Mod.props).
+    Keep this assembly free of third-party dependencies.
+  -->
+  <PropertyGroup>
+    <RootNamespace>SpiralLoader.Api</RootNamespace>
+    <AssemblyName>SpiralLoader.Api</AssemblyName>
+    <Description>Public API for SpiralLoader mods.</Description>
+    <!-- The API assembly version only changes on breaking API changes, so mods keep binding across patch releases. -->
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+  </PropertyGroup>
+</Project>

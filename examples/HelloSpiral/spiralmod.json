@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "hello-spiral",
+  "version": "1.0.0",
+  "name": "Hello Spiral",
+  "description": "Example mod: lifecycle events, a command, a public API for other mods, and a declared Lua asset.",
+  "authors": ["SpiralLoader contributors"],
+  "entrypoints": {
+    "server": ["HelloSpiral.HelloSpiralMod"]
+  },
+  "assemblies": ["HelloSpiral.dll"],
+  "depends": {
+    "spiralloader": ">=0.1.0 <0.2.0"
+  },
+  "assets": [
+    { "kind": "wad", "source": "assets/wad", "target": "GameData/Root.wad" }
+  ]
+}

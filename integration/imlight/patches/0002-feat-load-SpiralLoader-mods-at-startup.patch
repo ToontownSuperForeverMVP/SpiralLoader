@@ -1,0 +1,446 @@
+From 248391b8bf2514e9bd054b5a2a5a6016123316da Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 05:26:14 +0000
+Subject: [PATCH 2/6] feat: load SpiralLoader mods at startup
+
+The Director starts the mod loader right after configuration, before the
+actor system, resources, or any server exist, then publishes lifecycle
+events (ServerStarting, ServerResourcesLoaded, ServerStarted) on
+ImlightModding.Events. Loader and mod log output goes through Imlight's
+Logger. Behaviour is configured by the new [SpiralLoader] section of
+Imlight.ini; with no mods installed Imlight behaves as before.
+
+ImlightModding holds the attached event bus and registries. Until a loader
+attaches, it exposes an inert bus, so call sites cost one interface call.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/Imlight.CoreLib/Modding/ImlightEvents.cs  |  60 +++++
+ src/Imlight.CoreLib/Modding/ImlightModding.cs | 208 ++++++++++++++++++
+ src/Imlight.Director/Config/Imlight.ini       |  18 ++
+ src/Imlight.Director/Program.cs               |  73 ++++++
+ 4 files changed, 359 insertions(+)
+ create mode 100644 src/Imlight.CoreLib/Modding/ImlightEvents.cs
+ create mode 100644 src/Imlight.CoreLib/Modding/ImlightModding.cs
+
+diff --git a/src/Imlight.CoreLib/Modding/ImlightEvents.cs b/src/Imlight.CoreLib/Modding/ImlightEvents.cs
+new file mode 100644
+index 00000000..29bf3366
+--- /dev/null
++++ b/src/Imlight.CoreLib/Modding/ImlightEvents.cs
+@@ -0,0 +1,60 @@
++/*
++ * Imlight
++ * Copyright (C) 2025 Revive101
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Affero General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Affero General Public License for more details.
++ *
++ * You should have received a copy of the GNU Affero General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ *
++ * ========================================================================
++ * MOD EVENTS
++ * ========================================================================
++ *
++ * PURPOSE:
++ * Events Imlight publishes to mods through ImlightModding.Events.
++ *
++ * USAGE EXAMPLE:
++ * context.Events.Subscribe<LootGrantingEvent>(e => e.Results.GoldAmount *= 2);
++ *
++ * NOTE:
++ * Handlers run synchronously on the publishing actor's thread: do not block, and do not keep references to
++ * the event's objects after the handler returns.
++ *
++ * TODO:
++ *
++ * Created by: SpiralLoader contributors
++ * Version: KALI 1.0
++ * Last Updated: 10/19/2026
++ */
++
++using Akka.Actor;
++using Imlight.CoreLib.WizardData.Models.Player;
++using Imlight.CoreLib.WizardData.Models.World;
++
++namespace Imlight.CoreLib.Modding;
++
++/// <summary>
++/// Published by <c>LootGranter.GrantAndDisplay</c> after a drop table has been rolled (and experience scaled)
++/// and before anything is granted or shown. Handlers may change <see cref="Results"/>: items, gold, experience.
++/// </summary>
++public sealed class LootGrantingEvent(IActorRef playerActor, Wizard wizard, DropTableResult results) {
++
++    /// <summary>The player's SessionActor.</summary>
++    public IActorRef PlayerActor { get; } = playerActor;
++
++    /// <summary>The wizard receiving the rewards.</summary>
++    public Wizard Wizard { get; } = wizard;
++
++    /// <summary>The rolled rewards. Changes are granted and displayed.</summary>
++    public DropTableResult Results { get; } = results;
++
++}
+diff --git a/src/Imlight.CoreLib/Modding/ImlightModding.cs b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+new file mode 100644
+index 00000000..b90ce33f
+--- /dev/null
++++ b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+@@ -0,0 +1,208 @@
++/*
++ * Imlight
++ * Copyright (C) 2025 Revive101
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Affero General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Affero General Public License for more details.
++ *
++ * You should have received a copy of the GNU Affero General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ *
++ * ========================================================================
++ * MOD INTEGRATION
++ * ========================================================================
++ *
++ * PURPOSE:
++ * Connects Imlight to SpiralLoader. Holds the event bus and registries the mod loader attaches at startup,
++ * and the helpers Imlight's call sites use to consult them. Without a loader attached, every member is inert
++ * and Imlight behaves exactly as it does unmodded.
++ *
++ * USAGE EXAMPLE:
++ * if (ImlightModding.Events.HasSubscribers<LootGrantingEvent>()) {
++ *     ImlightModding.Events.Publish(new LootGrantingEvent(playerActor, wizard, results));
++ * }
++ *
++ * NOTE:
++ * Event handlers run synchronously on the publishing actor's thread. Registrations close once mods have
++ * initialized, so the bus and registries are immutable while the server runs.
++ *
++ * TODO:
++ * - More hook points (see SpiralLoader docs/next-milestone.md).
++ *
++ * Created by: SpiralLoader contributors
++ * Version: KALI 1.0
++ * Last Updated: 10/19/2026
++ */
++
++using System;
++using System.Collections.Generic;
++using System.Threading;
++using Imlight.Common;
++using Imlight.CoreLib.Shared.Networking;
++using Imlight.CoreLib.WizardData.Models.Player;
++using SpiralLoader.Api.Commands;
++using SpiralLoader.Api.Events;
++using SpiralLoader.Api.Registries;
++
++namespace Imlight.CoreLib.Modding;
++
++/// <summary>
++/// Imlight's connection to the SpiralLoader mod loader.
++/// </summary>
++public static class ImlightModding {
++
++    /// <summary>
++    /// Version of Imlight's mod-facing surface (events, registries, behaviors). Exposed to mods as the
++    /// <c>imlight</c> dependency. Bump the major version on breaking changes to any of it.
++    /// </summary>
++    public const string IntegrationApiVersion = "1.0.0";
++
++    private const string NoPermissionReply = "You do not have permission to use this command.";
++
++    private static readonly object s_attachLock = new();
++    private static Dictionary<string, RegistryEntry<ModCommand>> s_commands;
++
++    /// <summary>The mod event bus, or an inert bus when no loader is attached.</summary>
++    public static IEventBus Events { get; private set; } = NullEventBus.Instance;
++
++    /// <summary>The mod registries, or an empty provider when no loader is attached.</summary>
++    public static IRegistryProvider Registries { get; private set; } = EmptyRegistryProvider.Instance;
++
++    public static bool IsAttached { get; private set; }
++
++    /// <summary>
++    /// Attaches the loaded mods. Called once by the Director, after mods initialize and before any server starts.
++    /// </summary>
++    public static void Attach(IEventBus events, IRegistryProvider registries) {
++        ArgumentNullException.ThrowIfNull(events);
++        ArgumentNullException.ThrowIfNull(registries);
++
++        lock (s_attachLock) {
++            if (IsAttached) {
++                throw new InvalidOperationException("A mod loader is already attached.");
++            }
++
++            Events = events;
++            Registries = registries;
++            IsAttached = true;
++        }
++    }
++
++    /// <summary>
++    /// Validator for <see cref="ImlightRegistries.GameMessageServices"/> and
++    /// <see cref="ImlightRegistries.LoginMessageServices"/>. Returns null when the type is usable.
++    /// </summary>
++    public static string ValidateMessageService(Type type) {
++        if (type is null) {
++            return "the service type is null.";
++        }
++
++        if (!typeof(MessageService).IsAssignableFrom(type)) {
++            return $"{type.FullName} does not derive from Imlight's MessageService.";
++        }
++
++        if (type.IsAbstract || type.ContainsGenericParameters) {
++            return $"{type.FullName} must be a concrete, non-generic class.";
++        }
++
++        if (type.GetConstructor([typeof(SessionActor)]) is null) {
++            return $"{type.FullName} needs a public constructor taking a SessionActor.";
++        }
++
++        return null;
++    }
++
++    /// <summary>
++    /// Adds the message services mods registered under <paramref name="key"/> to a factory's built-in set.
++    /// </summary>
++    internal static HashSet<Type> WithModServices(RegistryKey<Type> key, HashSet<Type> builtIn) {
++        if (!Registries.TryGet(key, out var registry)) {
++            return builtIn;
++        }
++
++        foreach (var entry in registry.Entries) {
++            if (builtIn.Add(entry.Value)) {
++                Logger.Information("Mod {0} added message service {1} ({2}).",
++                    Logger.Args(entry.OwnerModId, entry.Value.FullName, key.Name));
++            }
++        }
++
++        return builtIn;
++    }
++
++    /// <summary>
++    /// Runs a mod-registered command. Returns false when no mod registered the command word.
++    /// </summary>
++    internal static bool TryExecuteCommand(string commandLine, Account account, out string reply) {
++        reply = null;
++        var commands = GetCommands();
++        if (commands.Count == 0) {
++            return false;
++        }
++
++        var parts = commandLine.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
++        if (parts.Length == 0 || !commands.TryGetValue(parts[0], out var entry)) {
++            return false;
++        }
++
++        var isOperator = account is not null && account.AuthLevel >= AuthLevel.Administrator;
++        if (entry.Value.OperatorOnly && !isOperator) {
++            reply = NoPermissionReply;
++            return true;
++        }
++
++        try {
++            reply = entry.Value.Execute(new ModCommandInvocation(parts[1..], account?.Username ?? "unknown", isOperator));
++        } catch (Exception ex) {
++            Logger.Error("Command {0} from mod {1} threw: {2}", Logger.Args(parts[0], entry.OwnerModId, ex.ToString()));
++            reply = "The command failed. See the server log.";
++        }
++
++        return true;
++    }
++
++    private static Dictionary<string, RegistryEntry<ModCommand>> GetCommands() {
++        var commands = Volatile.Read(ref s_commands);
++        if (commands is not null) {
++            return commands;
++        }
++
++        // Registrations are closed by the time any command arrives, so building the table once is safe.
++        commands = new Dictionary<string, RegistryEntry<ModCommand>>(StringComparer.OrdinalIgnoreCase);
++        if (Registries.TryGet(CommonRegistries.Commands, out var registry)) {
++            foreach (var entry in registry.Entries) {
++                if (!commands.TryAdd(entry.Value.Name, entry)) {
++                    Logger.Warning("Command {0} from mod {1} is ignored: mod {2} registered it first.",
++                        Logger.Args(entry.Value.Name, entry.OwnerModId, commands[entry.Value.Name].OwnerModId));
++                }
++            }
++        }
++
++        _ = Interlocked.CompareExchange(ref s_commands, commands, null);
++        return Volatile.Read(ref s_commands);
++    }
++
++}
++
++/// <summary>
++/// Registries Imlight consumes. Mods contribute through <c>context.Registries.Get(...)</c> during initialization.
++/// </summary>
++public static class ImlightRegistries {
++
++    /// <summary>
++    /// Extra message services attached to every game session. Values are <see cref="Type"/>s deriving from
++    /// Imlight's MessageService with a public constructor taking a SessionActor.
++    /// </summary>
++    public static RegistryKey<Type> GameMessageServices { get; } = new("imlight:game_message_services");
++
++    /// <summary>Extra message services attached to every login session.</summary>
++    public static RegistryKey<Type> LoginMessageServices { get; } = new("imlight:login_message_services");
++
++}
+diff --git a/src/Imlight.Director/Config/Imlight.ini b/src/Imlight.Director/Config/Imlight.ini
+index e35547da..0b03482d 100644
+--- a/src/Imlight.Director/Config/Imlight.ini
++++ b/src/Imlight.Director/Config/Imlight.ini
+@@ -154,3 +154,21 @@ SessionTokenBucketPerSecond = 50
+ SessionTokenBucketFailedAcquisitionLimit = 5
+ ; The time in seconds that the local wad cache will wait for the patch server to respond.
+ LocalWadCacheWaitForPatchServerTimeout = 10
++
++[SpiralLoader]
++; SpiralLoader mod loader. With no mods installed Imlight behaves exactly as it does without the loader.
++; Mods are folders containing a spiralmod.json inside ModsDirectory. Changing mods requires a restart.
++Enabled = true
++; Relative paths resolve against the server directory.
++ModsDirectory = mods
++DataDirectory = moddata
++ConfigDirectory = Config/mods
++; Per-profile mod data lives in DataDirectory/<Profile>/<mod id>.
++Profile = default
++; Abort: refuse to start if any mod fails. Continue: start without the failed mods.
++FailurePolicy = Abort
++; Strict: reject mods pinned to other Imlight commits or client revisions. WarnOnly: load them with a warning.
++CompatibilityMode = Strict
++; Comma-separated mod ids to keep installed but not load.
++DisabledMods =
++LogLevel = Information
+diff --git a/src/Imlight.Director/Program.cs b/src/Imlight.Director/Program.cs
+index 86050891..b0c6afb0 100644
+--- a/src/Imlight.Director/Program.cs
++++ b/src/Imlight.Director/Program.cs
+@@ -54,6 +54,9 @@ using Imlight.CoreLib.WizardData;
+ using Imlight.CoreLib.WizardData.Databases;
+ using Imlight.CoreLib.WizardData.Models.Player;
+ using Imlight.CoreLib.WizardData.Collections;
++using Imlight.CoreLib.Modding;
++using SpiralLoader.Api.Events;
++using SpiralLoader.Api.Logging;
+ 
+ namespace Imlight.Director;
+ 
+@@ -111,6 +114,19 @@ internal static class Program {
+         );
+         Logger.Information("Imlight configuration loaded.");
+ 
++        // =============================================================
++        // MODS (SPIRALLOADER)
++        // =============================================================
++        // Mods load before the actor system and before anything reflects over the loaded assemblies:
++        // requirement, result and zone component handlers are discovered from every loaded assembly on
++        // first use, and service factories read mod services when they are created.
++        if (!StartModLoader()) {
++            Environment.ExitCode = 1;
++
++            return;
++        }
++        ImlightModding.Events.Publish(new ServerStartingEvent(SpiralLoader.Imlight.ImlightModLoader.HostName));
++
+         // =============================================================
+         // AKKA.NET CONFIGURATION
+         // =============================================================
+@@ -138,6 +154,7 @@ internal static class Program {
+         var resourceContainer = new ResourceContainer();
+         LoadResources();
+         Logger.Information("Director has called all resources to load.");
++        ImlightModding.Events.Publish(new ServerResourcesLoadedEvent(SpiralLoader.Imlight.ImlightModLoader.HostName));
+         stopwatch.Stop();
+         Logger.Information($"Resource loading completed in {0} ms.",
+             Logger.Args(stopwatch.ElapsedMilliseconds));
+@@ -156,6 +173,7 @@ internal static class Program {
+ 
+         // Keep program busy with a while loop.
+         Logger.Information("Imlight may now be connected to.");
++        ImlightModding.Events.Publish(new ServerStartedEvent(SpiralLoader.Imlight.ImlightModLoader.HostName));
+         while (true) {
+             // Sleep for 5 minutes.
+             Thread.Sleep(300000);
+@@ -168,6 +186,61 @@ internal static class Program {
+         // Load SpiralDB — the in-memory world database from JSON files.
+         SpiralDB.Load();
+     }
++
++    private static bool StartModLoader() {
++        try {
++            var loader = SpiralLoader.Imlight.ImlightModLoader.Start(new SpiralLoader.Imlight.ImlightLoaderOptions {
++                BaseDirectory = AppDomain.CurrentDomain.BaseDirectory,
++                Settings = ConfigurationManager.GetSection("SpiralLoader"),
++                IntegrationApiVersion = ImlightModding.IntegrationApiVersion,
++                ImlightCommit = SpiralLoader.Imlight.ImlightModLoader.ReadStampedCommit(typeof(Program).Assembly),
++                ClientRevision = ConfigurationManager.GetSetting("Global Settings.GameRevision"),
++                Log = WriteModLog,
++                DeclareRegistries = host => {
++                    host.AddRegistry(ImlightRegistries.GameMessageServices, ImlightModding.ValidateMessageService);
++                    host.AddRegistry(ImlightRegistries.LoginMessageServices, ImlightModding.ValidateMessageService);
++                    host.AddRegistry(SpiralLoader.Api.Commands.CommonRegistries.Commands,
++                        SpiralLoader.Runtime.ModCommandRouter.Validate);
++                },
++            });
++
++            // Null when [SpiralLoader] Enabled = false: Imlight keeps its inert event bus.
++            if (loader is not null) {
++                ImlightModding.Attach(loader.Events, loader.Registries);
++            }
++
++            return true;
++        } catch (SpiralLoader.Runtime.ModLoadException) {
++            Logger.Fatal("SpiralLoader could not load the installed mods (see the report above). Fix or remove " +
++                         "them, or set FailurePolicy = Continue in the [SpiralLoader] section of Imlight.ini.");
++
++            return false;
++        }
++    }
++
++    private static void WriteModLog(ModLogLevel level, string source, string message, Exception exception) {
++        var args = Logger.Args(source, exception is null ? message : $"{message}{Environment.NewLine}{exception}");
++        switch (level) {
++            case ModLogLevel.Trace:
++                Logger.Verbose("[{0}] {1}", args);
++                break;
++            case ModLogLevel.Debug:
++                Logger.Debug("[{0}] {1}", args);
++                break;
++            case ModLogLevel.Information:
++                Logger.Information("[{0}] {1}", args);
++                break;
++            case ModLogLevel.Warning:
++                Logger.Warning("[{0}] {1}", args);
++                break;
++            case ModLogLevel.Error:
++                Logger.Error("[{0}] {1}", args);
++                break;
++            default:
++                Logger.Fatal("[{0}] {1}", args);
++                break;
++        }
++    }
+     private static IActorRef StartLoginServer() {
+         var loginServerName = s_loginServerName;
+         var loginServerPort = s_loginServerPort;
+-- 
+2.43.0
+

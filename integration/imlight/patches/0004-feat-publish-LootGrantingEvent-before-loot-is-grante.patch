@@ -1,0 +1,41 @@
+From 0820b6744063a5bb966d809689070406bbc31901 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 05:26:14 +0000
+Subject: [PATCH 4/6] feat: publish LootGrantingEvent before loot is granted
+
+Mods can change rolled rewards (items, gold, experience) before
+LootGranter grants and displays them. Skipped entirely when nothing
+subscribes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/Imlight.CoreLib/Game/DropTables/LootGranter.cs | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/Imlight.CoreLib/Game/DropTables/LootGranter.cs b/src/Imlight.CoreLib/Game/DropTables/LootGranter.cs
+index 92c480a4..f250ff6c 100644
+--- a/src/Imlight.CoreLib/Game/DropTables/LootGranter.cs
++++ b/src/Imlight.CoreLib/Game/DropTables/LootGranter.cs
+@@ -51,6 +51,7 @@ using Imcodec.ObjectProperty;
+ using Imcodec.ObjectProperty.TypeCache;
+ using Imlight.Common;
+ using Imlight.CoreLib.Game.Spells;
++using Imlight.CoreLib.Modding;
+ using Imlight.CoreLib.Shared.Packets;
+ using Imlight.CoreLib.Shared.Resources;
+ using Imlight.CoreLib.WizardData.Collections;
+@@ -82,6 +83,11 @@ public static class LootGranter {
+             results.ExperienceAmount = (int) (results.ExperienceAmount * xpScale);
+         }
+ 
++        // Mods may change the rolled rewards (items, gold, experience) before anything is granted.
++        if (ImlightModding.Events.HasSubscribers<LootGrantingEvent>()) {
++            ImlightModding.Events.Publish(new LootGrantingEvent(playerActor, wizard, results));
++        }
++
+         UpdateWizardGold(playerActor, wizard, results.GoldAmount);
+         UpdateWizardXP(playerActor, results.ExperienceAmount);
+         UpdateWizardTP(playerActor, wizard, results.TrainingPoints);
+-- 
+2.43.0
+
