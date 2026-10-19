@@ -46,7 +46,7 @@ internal static class Program {
         var exitCode = 0;
         var router = new ModCommandRouter(host.Registries.Get(CommonRegistries.Commands).Entries, host.Logger);
         foreach (var command in arguments.Commands) {
-            if (router.TryExecute(command, caller: "console", out var reply)) {
+            if (router.TryExecute(command, caller: "console", callerIsOperator: true, out var reply)) {
                 Console.WriteLine($"> {command}{Environment.NewLine}{reply}");
             } else {
                 host.Logger.Error($"No mod registered a command for '{command}'.");

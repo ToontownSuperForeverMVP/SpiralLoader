@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SpiralLoader.Runtime\SpiralLoader.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\SpiralLoader.Imlight\SpiralLoader.Imlight.csproj" />
     <!--
       Build-order-only references: the example mods and the headless host are built (and the mods assembled
       into artifacts/mods) before the tests run, but the tests never reference their assemblies. That is the

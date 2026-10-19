@@ -1,0 +1,6 @@
+<Project>
+  <!--
+    Stops MSBuild's upward search here, so third-party checkouts in external/ (such as Imlight) build with
+    their own settings instead of inheriting SpiralLoader's Directory.Build.props/.targets.
+  -->
+</Project>

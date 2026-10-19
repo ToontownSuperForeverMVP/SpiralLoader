@@ -1,0 +1,100 @@
+From 0741a8ff8b7c09e22e621fb2416b678b58b467b6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 05:26:14 +0000
+Subject: [PATCH 1/6] build: reference SpiralLoader from CoreLib and Director
+
+Adds src/SpiralLoader.props, which locates a SpiralLoader checkout (default:
+a sibling of this repository, override with -p:SpiralLoaderRoot=...).
+CoreLib references the dependency-free SpiralLoader.Api; the Director
+references SpiralLoader.Imlight, the loader bootstrap. The Director build
+also stamps the Imlight git commit into assembly metadata so mods pinned
+to specific commits can be checked.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/Imlight.CoreLib/Imlight.CoreLib.csproj   |  7 +++++
+ src/Imlight.Director/Imlight.Director.csproj | 27 ++++++++++++++++++++
+ src/SpiralLoader.props                       | 17 ++++++++++++
+ 3 files changed, 51 insertions(+)
+ create mode 100644 src/SpiralLoader.props
+
+diff --git a/src/Imlight.CoreLib/Imlight.CoreLib.csproj b/src/Imlight.CoreLib/Imlight.CoreLib.csproj
+index 17381dc4..cc3ec20c 100644
+--- a/src/Imlight.CoreLib/Imlight.CoreLib.csproj
++++ b/src/Imlight.CoreLib/Imlight.CoreLib.csproj
+@@ -17,6 +17,13 @@
+         <PackageReference Include="Nito.HashAlgorithms.CRC" Version="1.0.1" />
+     </ItemGroup>
+ 
++    <Import Project="..\SpiralLoader.props" />
++
++    <ItemGroup>
++        <!-- SpiralLoader: the public mod API (event bus, registries). Dependency-free. -->
++        <ProjectReference Include="$(SpiralLoaderRoot)src\SpiralLoader.Api\SpiralLoader.Api.csproj" />
++    </ItemGroup>
++
+     <ItemGroup>
+         <ProjectReference Include="..\Imlight.Common\Imlight.Common.csproj" />
+         <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.IO\Imcodec.IO.csproj" />
+diff --git a/src/Imlight.Director/Imlight.Director.csproj b/src/Imlight.Director/Imlight.Director.csproj
+index ca721c2d..00ef969e 100644
+--- a/src/Imlight.Director/Imlight.Director.csproj
++++ b/src/Imlight.Director/Imlight.Director.csproj
+@@ -40,4 +40,31 @@
+     <ProjectReference Include="..\Imlight.CoreLib\Imlight.CoreLib.csproj" />
+   </ItemGroup>
+ 
++  <Import Project="..\SpiralLoader.props" />
++
++  <ItemGroup>
++    <!-- SpiralLoader: loads mods from ./mods at startup. -->
++    <ProjectReference Include="$(SpiralLoaderRoot)src\SpiralLoader.Imlight\SpiralLoader.Imlight.csproj" />
++  </ItemGroup>
++
++  <!-- Stamp the Imlight commit so mods pinned to specific commits can be checked. Best effort: no git, no stamp. -->
++  <Target Name="SpiralLoaderStampImlightCommit" BeforeTargets="GetAssemblyAttributes" Condition="'$(ImlightCommit)' == ''">
++    <Exec Command="git rev-parse HEAD" WorkingDirectory="$(MSBuildProjectDirectory)" ConsoleToMSBuild="true" EchoOff="true"
++          StandardOutputImportance="low" StandardErrorImportance="low" IgnoreExitCode="true" ContinueOnError="true">
++      <Output TaskParameter="ConsoleOutput" PropertyName="_SpiralLoaderGitOutput" />
++      <Output TaskParameter="ExitCode" PropertyName="_SpiralLoaderGitExitCode" />
++    </Exec>
++    <PropertyGroup Condition="'$(_SpiralLoaderGitExitCode)' == '0'">
++      <ImlightCommit>$(_SpiralLoaderGitOutput.Trim())</ImlightCommit>
++    </PropertyGroup>
++  </Target>
++  <Target Name="SpiralLoaderAddCommitAttribute" AfterTargets="SpiralLoaderStampImlightCommit" BeforeTargets="GetAssemblyAttributes">
++    <ItemGroup Condition="'$(ImlightCommit)' != ''">
++      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
++        <_Parameter1>ImlightCommit</_Parameter1>
++        <_Parameter2>$(ImlightCommit)</_Parameter2>
++      </AssemblyAttribute>
++    </ItemGroup>
++  </Target>
++
+ </Project>
+diff --git a/src/SpiralLoader.props b/src/SpiralLoader.props
+new file mode 100644
+index 00000000..d9ae7d6a
+--- /dev/null
++++ b/src/SpiralLoader.props
+@@ -0,0 +1,17 @@
++<Project>
++  <!--
++    SpiralLoader integration (maintained by the SpiralLoader project, applied as a patch series).
++    SpiralLoaderRoot must point at a SpiralLoader checkout. Pass -p:SpiralLoaderRoot=<path>, or use one of the
++    detected layouts: Imlight checked out inside SpiralLoader/external/<name>, or SpiralLoader next to Imlight.
++  -->
++  <PropertyGroup>
++    <SpiralLoaderRoot Condition="'$(SpiralLoaderRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\..\src\SpiralLoader.Api\SpiralLoader.Api.csproj')">$(MSBuildThisFileDirectory)..\..\..\</SpiralLoaderRoot>
++    <SpiralLoaderRoot Condition="'$(SpiralLoaderRoot)' == ''">$(MSBuildThisFileDirectory)..\..\SpiralLoader\</SpiralLoaderRoot>
++    <SpiralLoaderRoot>$([MSBuild]::EnsureTrailingSlash('$(SpiralLoaderRoot)'))</SpiralLoaderRoot>
++  </PropertyGroup>
++
++  <Target Name="SpiralLoaderCheckRoot" BeforeTargets="ResolveProjectReferences;CollectPackageReferences">
++    <Error Condition="!Exists('$(SpiralLoaderRoot)src/SpiralLoader.Api/SpiralLoader.Api.csproj')"
++           Text="SpiralLoader was not found at '$(SpiralLoaderRoot)'. Clone it there or build with -p:SpiralLoaderRoot=&lt;path to SpiralLoader&gt;." />
++  </Target>
++</Project>
+-- 
+2.43.0
+

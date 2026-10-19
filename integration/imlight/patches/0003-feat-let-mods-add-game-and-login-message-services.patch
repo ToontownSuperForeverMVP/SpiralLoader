@@ -1,0 +1,80 @@
+From 6c8ca5a3bbd75b893704f8f037a5c98c8248cd5e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 05:26:14 +0000
+Subject: [PATCH 3/6] feat: let mods add game and login message services
+
+Game and login service factories append the service types mods register
+under ImlightRegistries.GameMessageServices / LoginMessageServices. Types
+are validated when registered: they must derive from MessageService and
+take a SessionActor.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/Imlight.CoreLib/Game/GameServiceFactory.cs   | 6 ++++--
+ src/Imlight.CoreLib/Login/LoginServiceFactory.cs | 6 ++++--
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/Imlight.CoreLib/Game/GameServiceFactory.cs b/src/Imlight.CoreLib/Game/GameServiceFactory.cs
+index 5c24b70c..41b9b01b 100644
+--- a/src/Imlight.CoreLib/Game/GameServiceFactory.cs
++++ b/src/Imlight.CoreLib/Game/GameServiceFactory.cs
+@@ -40,6 +40,7 @@ using System;
+ using System.Collections.Generic;
+ using Akka.Actor;
+ using Imlight.CoreLib.Game.Services;
++using Imlight.CoreLib.Modding;
+ using Imlight.CoreLib.Shared.Networking;
+ using Imlight.CoreLib.Shared.Services;
+ 
+@@ -47,7 +48,8 @@ namespace Imlight.CoreLib.Game;
+ 
+ public class GameServiceFactory : ServiceFactory {
+ 
+-    protected override HashSet<Type> ServiceTypes { get; set; } = [
++    // Mods add services through ImlightRegistries.GameMessageServices; with no mods the set is unchanged.
++    protected override HashSet<Type> ServiceTypes { get; set; } = ImlightModding.WithModServices(ImlightRegistries.GameMessageServices, [
+         typeof(ControlService),
+         typeof(AttachService),
+         typeof(AccountService),
+@@ -76,7 +78,7 @@ public class GameServiceFactory : ServiceFactory {
+         typeof(CinematicService),
+         typeof(PotionService),
+         typeof(TreasureShopService),
+-    ];
++    ]);
+ 
+     public static Props Props() 
+         => Akka.Actor.Props.Create(() => new GameServiceFactory());
+diff --git a/src/Imlight.CoreLib/Login/LoginServiceFactory.cs b/src/Imlight.CoreLib/Login/LoginServiceFactory.cs
+index be40031c..4b75c984 100644
+--- a/src/Imlight.CoreLib/Login/LoginServiceFactory.cs
++++ b/src/Imlight.CoreLib/Login/LoginServiceFactory.cs
+@@ -40,6 +40,7 @@ using System;
+ using System.Collections.Generic;
+ using Akka.Actor;
+ using Imlight.CoreLib.Login.Services;
++using Imlight.CoreLib.Modding;
+ using Imlight.CoreLib.Shared.Networking;
+ using Imlight.CoreLib.Shared.Services;
+ 
+@@ -47,14 +48,15 @@ namespace Imlight.CoreLib.Login;
+ 
+ public class LoginServiceFactory : ServiceFactory {
+ 
+-    protected override HashSet<Type> ServiceTypes { get; set; } = [
++    // Mods add services through ImlightRegistries.LoginMessageServices; with no mods the set is unchanged.
++    protected override HashSet<Type> ServiceTypes { get; set; } = ImlightModding.WithModServices(ImlightRegistries.LoginMessageServices, [
+         typeof(ControlService),
+         typeof(AccountService),
+         typeof(AuthenticatorService),
+         typeof(CharacterService),
+         typeof(GameTransitionService),
+         typeof(LoginAFKService),
+-    ];
++    ]);
+ 
+     public static Props Props() 
+         => Akka.Actor.Props.Create(() => new LoginServiceFactory());
+-- 
+2.43.0
+

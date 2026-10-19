@@ -1,0 +1,44 @@
+From d01daa9f8b57ae0588e1321f74e8d48cd8ad5e8d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 05:26:14 +0000
+Subject: [PATCH 5/6] feat: route unknown chat commands to mod commands
+
+When no built-in command matches, the dispatcher tries commands mods
+registered in SpiralLoader's command registry. Built-in commands always
+win. Operator-only mod commands require AuthLevel.Administrator.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/Imlight.CoreLib/Game/Commands/CommandDispatcher.cs | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/Imlight.CoreLib/Game/Commands/CommandDispatcher.cs b/src/Imlight.CoreLib/Game/Commands/CommandDispatcher.cs
+index 08ec8b45..3915c3e5 100644
+--- a/src/Imlight.CoreLib/Game/Commands/CommandDispatcher.cs
++++ b/src/Imlight.CoreLib/Game/Commands/CommandDispatcher.cs
+@@ -47,6 +47,7 @@ using System.Reflection;
+ using Akka.Actor;
+ using Imcodec.MessageLayer.Generated;
+ using Imlight.Common;
++using Imlight.CoreLib.Modding;
+ using Imlight.CoreLib.Shared.Networking;
+ using Imlight.CoreLib.Shared.Packets;
+ using Imlight.CoreLib.WizardData.Collections;
+@@ -141,6 +142,14 @@ internal class CommandDispatcher : ReceiveProtocolDispatcher {
+                 }
+             }
+ 
++            // Built-in commands always win; mod commands are only tried when nothing else matched.
++            if (!commandFound && ImlightModding.TryExecuteCommand(commandName, context.Account, out var modReply)) {
++                commandFound = true;
++                if (!string.IsNullOrEmpty(modReply)) {
++                    InformSenderClient(context, modReply);
++                }
++            }
++
+             if (!commandFound) {
+                 // Inform the invoker of his failure. Take his lunch money.
+                 InformSenderClient(context, "Command not found.");
+-- 
+2.43.0
+

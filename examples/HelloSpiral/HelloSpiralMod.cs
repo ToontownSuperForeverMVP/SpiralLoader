@@ -23,7 +23,13 @@ public sealed class HelloSpiralMod : ISpiralMod {
         context.Events.Subscribe<ServerStartedEvent>(OnServerStarted);
         context.Events.Subscribe<ServerStoppingEvent>(_ => context.Logger.Info("Server stopping; goodbye."));
 
-        context.Registries.Get(CommonRegistries.Commands).Register("hello", new ModCommand(
+        // Not every host exposes every registry; TryGet keeps the mod working where commands are unsupported.
+        if (!context.Registries.TryGet(CommonRegistries.Commands, out var commands)) {
+            context.Logger.Warn("This host has no command registry; the 'hello' command is unavailable.");
+            return;
+        }
+
+        commands!.Register("hello", new ModCommand(
             "hello",
             "Replies with a greeting.",
             invocation => {
@@ -32,7 +38,7 @@ public sealed class HelloSpiralMod : ISpiralMod {
                 var @event = new GreetingEvent(greeting);
                 context.Events.Publish(@event);
                 return @event.Text;
-            }));
+            }) { OperatorOnly = false });
     }
 
     public void Shutdown() => _context?.Logger.Info("Shutdown called.");

@@ -8,6 +8,9 @@ obj/
 TestResults/
 artifacts/
 # Local Imlight checkouts used for integration builds. Never commit Wizard101 data.
-external/
+external/*
+!external/README.md
+!external/Directory.Build.props
+!external/Directory.Build.targets
 *.wad
 LatestFileList.*
