@@ -134,7 +134,9 @@ public sealed class LoadingTests : IDisposable {
     [Fact]
     public void CorruptAssemblyFailsOnlyThatMod() {
         var directory = _workspace.AddManifest("corrupt", new {
-            schemaVersion = 1, id = "corrupt", version = "1.0.0",
+            schemaVersion = 1,
+            id = "corrupt",
+            version = "1.0.0",
             assemblies = new[] { "Corrupt.dll" },
             entrypoints = new { server = "Corrupt.Mod" },
         });

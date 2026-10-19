@@ -13,6 +13,5 @@
     <SpiralLoaderVersion>0.1.0</SpiralLoaderVersion>
     <Version>$(SpiralLoaderVersion)</Version>
     <Authors>SpiralLoader contributors</Authors>
-    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
   </PropertyGroup>
 </Project>

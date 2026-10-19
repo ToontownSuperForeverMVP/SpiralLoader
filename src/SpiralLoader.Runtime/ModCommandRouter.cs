@@ -33,7 +33,7 @@ public sealed partial class ModCommandRouter {
     /// </summary>
     public bool TryExecute(string commandLine, string caller, bool callerIsOperator, out string? reply) {
         reply = null;
-        var parts = commandLine.Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries);
+        var parts = commandLine.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0 || !_commands.TryGetValue(parts[0], out var entry)) {
             return false;
         }

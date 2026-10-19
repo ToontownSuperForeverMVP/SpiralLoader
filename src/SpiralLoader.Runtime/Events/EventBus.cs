@@ -86,7 +86,7 @@ internal sealed class EventBus {
             }
 
             try {
-                ((Action<TEvent>) subscription.Handler)(@event);
+                ((Action<TEvent>)subscription.Handler)(@event);
             } catch (Exception ex) {
                 _faults.AddOrUpdate(subscription.Owner, 1, (_, count) => count + 1);
                 if (FaultPolicy == HandlerFaultPolicy.Rethrow) {

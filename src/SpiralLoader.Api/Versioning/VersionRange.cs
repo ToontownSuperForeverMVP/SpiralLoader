@@ -139,26 +139,26 @@ public sealed class VersionRange {
                 }
                 return true;
             case "~": {
-                output.Add(new Comparator(ComparatorKind.GreaterOrEqual, partial.IsFull ? partial.Full! : lower));
-                var upper = partial.Minor is null
-                    ? Bound(partial.Major.Value + 1, 0, 0)
-                    : Bound(partial.Major.Value, partial.Minor.Value + 1, 0);
-                output.Add(new Comparator(ComparatorKind.Less, upper));
-                return true;
-            }
-            case "^": {
-                output.Add(new Comparator(ComparatorKind.GreaterOrEqual, partial.IsFull ? partial.Full! : lower));
-                SemanticVersion upper;
-                if (partial.Major.Value > 0 || partial.Minor is null) {
-                    upper = Bound(partial.Major.Value + 1, 0, 0);
-                } else if (partial.Minor.Value > 0 || partial.Patch is null) {
-                    upper = Bound(0, partial.Minor.Value + 1, 0);
-                } else {
-                    upper = Bound(0, 0, partial.Patch.Value + 1);
+                    output.Add(new Comparator(ComparatorKind.GreaterOrEqual, partial.IsFull ? partial.Full! : lower));
+                    var upper = partial.Minor is null
+                        ? Bound(partial.Major.Value + 1, 0, 0)
+                        : Bound(partial.Major.Value, partial.Minor.Value + 1, 0);
+                    output.Add(new Comparator(ComparatorKind.Less, upper));
+                    return true;
                 }
-                output.Add(new Comparator(ComparatorKind.Less, upper));
-                return true;
-            }
+            case "^": {
+                    output.Add(new Comparator(ComparatorKind.GreaterOrEqual, partial.IsFull ? partial.Full! : lower));
+                    SemanticVersion upper;
+                    if (partial.Major.Value > 0 || partial.Minor is null) {
+                        upper = Bound(partial.Major.Value + 1, 0, 0);
+                    } else if (partial.Minor.Value > 0 || partial.Patch is null) {
+                        upper = Bound(0, partial.Minor.Value + 1, 0);
+                    } else {
+                        upper = Bound(0, 0, partial.Patch.Value + 1);
+                    }
+                    output.Add(new Comparator(ComparatorKind.Less, upper));
+                    return true;
+                }
             default:
                 error = $"Unknown operator in '{token}'.";
                 return false;

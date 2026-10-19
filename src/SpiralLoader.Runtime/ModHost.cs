@@ -363,7 +363,7 @@ public sealed class ModHost : IModQuery {
             }
 
             try {
-                record.Entrypoints.Add((ISpiralMod) Activator.CreateInstance(type)!);
+                record.Entrypoints.Add((ISpiralMod)Activator.CreateInstance(type)!);
             } catch (TargetInvocationException ex) when (ex.InnerException is not null) {
                 record.Fail(DiagnosticCodes.InitializationFailed, $"Constructor of '{typeName}' threw {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
                 return false;
