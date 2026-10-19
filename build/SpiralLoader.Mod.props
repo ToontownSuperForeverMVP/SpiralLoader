@@ -1,0 +1,22 @@
+<Project>
+  <!--
+    Import from a mod project (before or after the SDK props) to get the standard SpiralLoader mod layout:
+
+      <Import Project="path/to/SpiralLoader/build/SpiralLoader.Mod.props" />
+      <PropertyGroup><SpiralModId>my-mod</SpiralModId></PropertyGroup>
+
+    Properties:
+      SpiralModId            Required. Must match "id" in spiralmod.json.
+      SpiralModOutputRoot    Where "dotnet build" assembles the ready-to-install mod folder
+                             (default: <repo>/artifacts/mods). The folder is $(SpiralModOutputRoot)/$(SpiralModId).
+      SpiralLoaderApiPath    Path to SpiralLoader.Api.dll for mods built outside this repository.
+      ImlightDirectory       Optional. A built Imlight server directory (contains Imlight.CoreLib.dll). When set,
+                             Imlight, Akka and Imcodec assemblies are referenced without being copied.
+  -->
+  <PropertyGroup>
+    <!-- Produces a .deps.json and copies NuGet dependencies, which plugin loading needs. -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <SpiralModOutputRoot Condition="'$(SpiralModOutputRoot)' == '' and '$(SpiralLoaderRepoRoot)' != ''">$(SpiralLoaderRepoRoot)artifacts/mods/</SpiralModOutputRoot>
+    <SpiralModOutputRoot Condition="'$(SpiralModOutputRoot)' == ''">$(MSBuildProjectDirectory)/bin/mods/</SpiralModOutputRoot>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Plugin manager: discovery, manifests, dependency resolution, assembly loading, lifecycle, events. -->
+  <PropertyGroup>
+    <RootNamespace>SpiralLoader.Runtime</RootNamespace>
+    <AssemblyName>SpiralLoader.Runtime</AssemblyName>
+    <Description>SpiralLoader runtime plugin manager.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SpiralLoader.Api\SpiralLoader.Api.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SpiralLoader.Tests" />
+  </ItemGroup>
+</Project>
