@@ -1,0 +1,83 @@
+From 49bb884e6adcc22dfaa595fe2344592ac3d06164 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 16:48:08 +0000
+Subject: [PATCH 07/10] feat: publish CharacterListSentEvent after the
+ character list is sent
+
+Mods can follow up the character list with their own client messages,
+for example to start a client process at the character select screen.
+Skipped entirely when nothing subscribes.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: [AI session link removed]
+---
+ .../Login/Services/CharacterService.cs        |  6 +++++
+ src/Imlight.CoreLib/Modding/ImlightEvents.cs  | 23 +++++++++++++++++++
+ 2 files changed, 29 insertions(+)
+
+diff --git a/src/Imlight.CoreLib/Login/Services/CharacterService.cs b/src/Imlight.CoreLib/Login/Services/CharacterService.cs
+index 95584a7f..76c5efc8 100644
+--- a/src/Imlight.CoreLib/Login/Services/CharacterService.cs
++++ b/src/Imlight.CoreLib/Login/Services/CharacterService.cs
+@@ -39,6 +39,7 @@ using Imcodec.MessageLayer.Generated;
+ using Imcodec.ObjectProperty;
+ using Imcodec.ObjectProperty.TypeCache;
+ using Imlight.Common;
++using Imlight.CoreLib.Modding;
+ using Imlight.CoreLib.Shared.Behaviors;
+ using Imlight.CoreLib.Shared.Character;
+ using Imlight.CoreLib.Shared.Networking;
+@@ -195,6 +196,11 @@ internal class CharacterService(SessionActor parentActor) : MessageService(paren
+ 
+         // Tell the client we've finished sending the character list.
+         SendToSocket(new LOGIN_7_PROTOCOL.MSG_CHARACTERLIST());
++
++        // Mods may follow up the character list, e.g. by starting a client process.
++        if (ImlightModding.Events.HasSubscribers<CharacterListSentEvent>()) {
++            ImlightModding.Events.Publish(new CharacterListSentEvent(account, SendToSocket));
++        }
+     }
+ 
+     [MessageHandler(typeof(LOGIN_7_PROTOCOL.MSG_LOGINLOGCHARACTERCREATION))]
+diff --git a/src/Imlight.CoreLib/Modding/ImlightEvents.cs b/src/Imlight.CoreLib/Modding/ImlightEvents.cs
+index 29bf3366..1df14387 100644
+--- a/src/Imlight.CoreLib/Modding/ImlightEvents.cs
++++ b/src/Imlight.CoreLib/Modding/ImlightEvents.cs
+@@ -36,7 +36,9 @@
+  * Last Updated: 10/19/2026
+  */
+ 
++using System;
+ using Akka.Actor;
++using Imcodec.MessageLayer;
+ using Imlight.CoreLib.WizardData.Models.Player;
+ using Imlight.CoreLib.WizardData.Models.World;
+ 
+@@ -58,3 +60,24 @@ public sealed class LootGrantingEvent(IActorRef playerActor, Wizard wizard, Drop
+     public DropTableResult Results { get; } = results;
+ 
+ }
++
++/// <summary>
++/// Published by the login server's <c>CharacterService</c> after the character list (<c>MSG_CHARACTERLIST</c>) has
++/// been sent to the client. Not published when the list could not be built or sent. Handlers typically use
++/// <see cref="Send"/> to give the client something extra at the character select screen, such as a client process.
++/// </summary>
++public sealed class CharacterListSentEvent(Account account, Action<IMessage> send) {
++
++    /// <summary>The account that received the character list.</summary>
++    public Account Account { get; } = account;
++
++    /// <summary>
++    /// Sends a message to the client's login socket. Only valid while the handler runs: do not keep this event
++    /// or call <see cref="Send"/> later from another thread.
++    /// </summary>
++    public void Send(IMessage message) {
++        ArgumentNullException.ThrowIfNull(message);
++        send(message);
++    }
++
++}
+-- 
+2.43.0
+

@@ -16,7 +16,7 @@ dotnet test SpiralLoader.sln
 ```
 
 `dotnet build` also assembles the example mods into installable folders under `artifacts/mods/`.
-The test suite (146 tests) covers versioning, manifests, dependency resolution and ordering, assembly loading
+The test suite (150 tests) covers versioning, manifests, dependency resolution and ordering, assembly loading
 and failure isolation (with mods compiled at test time by Roslyn), events, registries, asset planning,
 compatibility pins, the Imlight bootstrap, and an out-of-process run of the headless host.
 
@@ -49,6 +49,13 @@ Akka and SpiralLoader), boots `Program.Main` with `hello-spiral` and a mod that 
 service, and checks the output: loader report through Imlight's logger, lifecycle events, and mod services
 merged by the real patched service factories. Set `IMLIGHT_COMMIT` (bash) or `-Commit` (PowerShell) to verify
 another Imlight commit; both `b07987168fcf…` and `2a16010e59b9…` pass.
+
+Since integration API 1.1.0 the harness also compiles the real patched `CharacterService`,
+`GameTransitionService`, `MinigameService` and `ProcessSupervisor` (with Imlight's real packet, dispatcher and
+message-handler files) and drives the first three through a recording stub session and a stub game server
+(`verify/Scenarios.cs`), asserting the results listed in `verify/expected-output.txt`. Imcodec's generated
+types are stubbed in `verify/ImcodecStubs.cs`; those stubs follow how the pinned source uses the types and
+cannot prove they match the generated code.
 
 What it does **not** prove: that all of the patched `Imlight.CoreLib` compiles. The `LootGranter` and
 `CommandDispatcher` call sites, and everything else that needs Imcodec's generated types, are only compiled by
@@ -86,7 +93,7 @@ optional). With `Enabled = false`, or with no mods installed, Imlight behaves as
 ```bash
 cd external/Imlight          # a checkout produced by setup-imlight.sh, on branch "spiralloader"
 # edit, then amend or add commits on top of the pinned commit
-git format-patch <pinned-commit>..HEAD -o ../../integration/imlight/patches/
+../../integration/imlight/regen-patches.sh     # deletes the old series, then git format-patch <pinned>..HEAD
 ```
 
 Then rerun the verification for the pinned commit and current upstream, and update

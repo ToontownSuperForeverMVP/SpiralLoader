@@ -33,19 +33,7 @@ if (-not $process.WaitForExit(60000)) { Stop-Process -Id $process.Id -Force }
 $process.WaitForExit()
 $output = Get-Content -Raw $outputFile
 
-$expected = @(
-    'SpiralLoader 0.1.0 starting (host: Imlight',
-    '2 mod(s) found, 2 initialized, 0 failed.',
-    '[hello-spiral] Hello from Hello Spiral 1.0.0 on Imlight.',
-    'VERIFY: event ServerStarting Imlight',
-    'VERIFY: SpiralDB.Load',
-    'VERIFY: event ServerResourcesLoaded',
-    'VERIFY: login services=6 mod=[]',
-    'mod=[ImlightVerifyMod.VerifyService]',
-    'Mod imlight-verify added message service ImlightVerifyMod.VerifyService',
-    'Imlight may now be connected to.',
-    'VERIFY: event ServerStarted'
-)
+$expected = Get-Content (Join-Path $PSScriptRoot 'expected-output.txt') | Where-Object { $_.Trim() -ne '' }
 $failed = $false
 Write-Host "Checking patched Director startup ($Commit):"
 foreach ($line in $expected) {

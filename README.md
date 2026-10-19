@@ -20,7 +20,8 @@ manifest and loaded once at server start.
 - Typed event bus (priorities, cancellation, fault isolation, lock-free after startup), namespaced registries,
   rollback of a failed mod's registrations, lifecycle events, logging.
 - Imlight hooks (patch series): loader start and lifecycle events, mod message services, `LootGrantingEvent`,
-  mod chat commands, tolerant assembly scanning. Verified by booting the real patched Director against stubs
+  mod chat commands, `CharacterListSentEvent`, `GameServerSelectingEvent`, a client process job-id registry,
+  tolerant assembly scanning. Verified by booting the real patched Director against stubs
   on both the pinned and the current upstream Imlight commit.
 - Asset declarations for client archives and SpiralDB, with deterministic overlay planning and conflict
   detection (writing archives is future work).

@@ -110,6 +110,29 @@ public sealed class ImlightBootstrapTests {
         Assert.True(host.Registries.TryGet(CommonRegistries.Commands, out _));
     }
 
+    [Theory]
+    [InlineData("1.0.0", false)]
+    [InlineData("1.1.0", true)]
+    public void ModsCanRequireHooksAddedInMinorIntegrationVersions(string integrationVersion, bool loads) {
+        using var workspace = new ModWorkspace();
+        workspace.AddDataMod("needs-1-1", extra: new() {
+            ["depends"] = new Dictionary<string, string> { ["imlight"] = "^1.1.0" },
+        });
+        var options = new ImlightLoaderOptions {
+            BaseDirectory = Path.GetDirectoryName(workspace.ModsDirectory)!,
+            Settings = new Dictionary<string, string> { ["FailurePolicy"] = "Continue" },
+            IntegrationApiVersion = integrationVersion,
+            Log = (_, _, _, _) => { },
+            RegisterProcessExit = false,
+        };
+
+        var host = ImlightModLoader.Start(options)!;
+
+        var mod = host.Report!.Find("needs-1-1")!;
+        Assert.Equal(loads ? ModState.Initialized : ModState.Rejected, mod.State);
+        Assert.Equal(!loads, mod.Diagnostics.Any(d => d.Code == DiagnosticCodes.DependencyVersionMismatch));
+    }
+
     [Fact]
     public void AbortPolicyPropagatesLoadFailure() {
         using var workspace = new ModWorkspace();

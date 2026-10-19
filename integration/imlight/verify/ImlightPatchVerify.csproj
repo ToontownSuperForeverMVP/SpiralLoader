@@ -19,6 +19,8 @@
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Real Imlight packet files compiled here leave unassigned fields (set by generated code at runtime); stubs ignore ctor args. -->
+    <NoWarn>$(NoWarn);CS0649;CS9113</NoWarn>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <ImlightSourceRoot Condition="'$(ImlightSourceRoot)' == ''">$(SpiralLoaderRepoRoot)external/Imlight/</ImlightSourceRoot>
     <!-- ImlightSourceRoot may be a global (command-line) property, which cannot be reassigned here. -->
@@ -27,6 +29,8 @@
 
   <ItemGroup>
     <Compile Include="Stubs.cs" />
+    <Compile Include="ImcodecStubs.cs" />
+    <Compile Include="Scenarios.cs" />
     <Compile Include="$(_Imlight)Imlight.Director/Program.cs" />
     <Compile Include="$(_Imlight)Imlight.Director/AkkaConfiguration.cs" />
     <Compile Include="$(_Imlight)Imlight.Director/ResourceContainer.cs" />
@@ -37,6 +41,17 @@
     <Compile Include="$(_Imlight)Imlight.CoreLib/Game/GameServiceFactory.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Login/LoginServiceFactory.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/ServiceFactory.cs" />
+    <!-- Real Imlight files for the hook call sites (their Imcodec-generated dependencies are stubbed in Stubs.cs). -->
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/ReceiveProtocolDispatcher.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/MessageHandlerTable.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/ServerInterfaces.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Packets/SERVER_100_PROTOCOL.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Packets/PROCESS_107_PROTOCOL.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Packets/SERVICE_101_PROTOCOL.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Login/Services/CharacterService.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Login/Services/GameTransitionService.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Game/Services/MinigameService.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Game/Processes/ProcessSupervisor.cs" />
   </ItemGroup>
 
   <ItemGroup>

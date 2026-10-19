@@ -1,7 +1,7 @@
-From 0820b6744063a5bb966d809689070406bbc31901 Mon Sep 17 00:00:00 2001
+From 0ac1b43d8ab980ab0ca2dfbd753b65812425a466 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 05:26:14 +0000
-Subject: [PATCH 4/6] feat: publish LootGrantingEvent before loot is granted
+Subject: [PATCH 04/10] feat: publish LootGrantingEvent before loot is granted
 
 Mods can change rolled rewards (items, gold, experience) before
 LootGranter grants and displays them. Skipped entirely when nothing

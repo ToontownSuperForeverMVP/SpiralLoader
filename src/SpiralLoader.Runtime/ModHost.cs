@@ -80,11 +80,17 @@ public sealed class ModHost : IModQuery {
     public ModLoadReport? Report { get; private set; }
 
     /// <summary>Declares a registry mods can contribute to. Must be called before <see cref="Load"/>.</summary>
-    public void AddRegistry<T>(RegistryKey<T> key, RegistryValidator<T>? validator = null) where T : notnull {
+    /// <param name="key">The registry's key.</param>
+    /// <param name="validator">Optional check run on every value; returns a rejection reason or null.</param>
+    /// <param name="uniqueValues">
+    /// When true, a value can be registered only once across all mods (claims, such as ids a host reserves).
+    /// A duplicate throws from <c>Register</c>, which fails the registering mod's initialization.
+    /// </param>
+    public void AddRegistry<T>(RegistryKey<T> key, RegistryValidator<T>? validator = null, bool uniqueValues = false) where T : notnull {
         if (Volatile.Read(ref _state) != 0) {
             throw new InvalidOperationException("Registries must be declared before Load().");
         }
-        _registries.Add(key, validator);
+        _registries.Add(key, validator, uniqueValues);
     }
 
     /// <summary>

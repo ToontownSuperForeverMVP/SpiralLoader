@@ -3,7 +3,9 @@
 #   1. clone Imlight at the pinned commit (or IMLIGHT_COMMIT) and apply the patches,
 #   2. compile the real patched Director Program.cs + new CoreLib files against functional stubs,
 #   3. boot the real Program.Main with the example mods and a mod that registers a message service,
-#   4. assert the loader report, lifecycle events and service merging in its output.
+#   4. drive the real patched CharacterService / GameTransitionService / MinigameService with a recording stub
+#      session (Scenarios.cs), then assert the loader report, lifecycle events, service merging and scenario
+#      results listed in expected-output.txt.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -38,17 +40,11 @@ expect() {
 }
 
 echo "Checking patched Director startup ($COMMIT):"
-expect "SpiralLoader 0.1.0 starting (host: Imlight"
-expect "2 mod(s) found, 2 initialized, 0 failed."
-expect "[hello-spiral] Hello from Hello Spiral 1.0.0 on Imlight."
-expect "VERIFY: event ServerStarting Imlight"
-expect "VERIFY: SpiralDB.Load"
-expect "VERIFY: event ServerResourcesLoaded"
-expect "VERIFY: login services=6 mod=[]"
-expect "mod=[ImlightVerifyMod.VerifyService]"
-expect "Mod imlight-verify added message service ImlightVerifyMod.VerifyService"
-expect "Imlight may now be connected to."
-expect "VERIFY: event ServerStarted"
+while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    [ -z "$line" ] && continue
+    expect "$line"
+done <"$VERIFY_DIR/expected-output.txt"
 if [ ! -f "$RUN_DIR/moddata/default/hello-spiral/started.txt" ]; then
     echo "  FAIL hello-spiral wrote moddata/default/hello-spiral/started.txt"
     status=1

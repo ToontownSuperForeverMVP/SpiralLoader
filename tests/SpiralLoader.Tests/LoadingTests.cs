@@ -51,6 +51,32 @@ public sealed class LoadingTests : IDisposable {
     }
 
     [Fact]
+    public void DuplicateClaimInUniqueRegistryFailsOnlyTheSecondMod() {
+        var claims = new SpiralLoader.Api.Registries.RegistryKey<uint>("test:claims");
+        string ClaimingMod(string ns) => $$"""
+            using SpiralLoader.Api;
+            namespace {{ns}};
+            public sealed class Mod : ISpiralMod {
+                public void Initialize(IModContext context)
+                    => context.Registries.Get(new SpiralLoader.Api.Registries.RegistryKey<uint>("test:claims")).Register("job", 770101u);
+            }
+            """;
+        _workspace.AddCodeMod("claims-first", "ClaimsFirst", ClaimingMod("ClaimsFirst"), ["ClaimsFirst.Mod"]);
+        _workspace.AddCodeMod("claims-second", "ClaimsSecond", ClaimingMod("ClaimsSecond"), ["ClaimsSecond.Mod"],
+            new() { ["loadAfter"] = new[] { "claims-first" } });
+
+        var host = _workspace.CreateHost();
+        host.AddRegistry(claims, uniqueValues: true);
+        var report = host.Load();
+
+        Assert.Equal(ModState.Initialized, report.Find("claims-first")!.State);
+        var second = report.Find("claims-second")!;
+        Assert.Equal(ModState.Failed, second.State);
+        Assert.Contains(second.Diagnostics, d => d.Code == DiagnosticCodes.InitializationFailed && d.Message.Contains("claims-first:job"));
+        Assert.Equal(["claims-first:job"], host.Registries.Get(claims).Entries.Select(e => e.Id));
+    }
+
+    [Fact]
     public void InitializationFailureRollsBackRegistrationsAndFailsDependents() {
         var channel = TestJournal.NewChannel();
         _workspace.AddCodeMod("faulty", "Faulty", $$"""
