@@ -82,6 +82,7 @@ internal static class Program {
     /// Nothing here needs Imlight or game assets, and nothing here proves behaviour that does.
     /// </summary>
     private static int RunCheck(ModHost host, HostArguments arguments) {
+        Console.WriteLine("SECURITY: --check loads and executes native mod code. It is not a sandbox or a passive static analyzer; only check mods you trust.");
         host.AddRegistry(CommonRegistries.Commands, ModCommandRouter.Validate);
         var report = host.Load();
 
@@ -142,7 +143,8 @@ internal sealed class HostArguments {
           --mods <dir>            Directory containing mod folders (repeatable; default: ./mods)
           --mod <dir>             One mod folder (contains spiralmod.json; repeatable), e.g. a build output
           --check                 Compatibility check: load every mod without aborting, run the lifecycle events,
-                                  print a PASS/FAIL verdict (exit 0/1)
+                                  print a PASS/FAIL verdict (exit 0/1); executes native mod code
+                                  NOT a sandbox or passive static analyzer; only check trusted mods
           --imlight-api <ver>     Provide the 'imlight' built-in at this integration API version (simulated)
           --warnings-as-errors    With --check, treat warning diagnostics as failures
           --data <dir>            Mod data root (default: ./moddata)
