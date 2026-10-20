@@ -172,6 +172,10 @@ state without changing it.
 
 ## 5. Testing your mod
 
+**Trust boundary:** `SpiralLoader.Host --check` loads and executes the mod's native assemblies. It is not a security
+sandbox or a passive static analyzer. Only run it on mods you trust; use an operating-system isolation boundary for
+untrusted code.
+
 Run `SpiralLoader.Host --check --mod <your build output>` locally and in CI; it needs no game files or Imlight
 and reports each problem with a code and a fix. See [compatibility-testing.md](compatibility-testing.md) for the
 options, what it does and does not prove, and the scenarios the project itself tests.

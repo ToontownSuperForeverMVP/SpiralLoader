@@ -3,6 +3,11 @@
 You can check that a mod loads, initializes, shuts down and reports problems properly **without Wizard101 files,
 without an Imlight checkout and without a game client**, using the headless host:
 
+> **Security:** `--check` loads assemblies and executes mod code, including constructors, `Initialize`, lifecycle
+> handlers, requested `--run` commands, and `Shutdown`. It is **not a security sandbox** and it is **not a passive
+> static analyzer**. A mod can access files, processes, and the network with the permissions of the host process.
+> Only run it on mods you trust. Use an operating-system isolation boundary if you must inspect an untrusted mod.
+
 ```bash
 # once: build the host and the API your mod references
 dotnet build src/SpiralLoader.Host -c Release
