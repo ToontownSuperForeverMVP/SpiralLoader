@@ -1,0 +1,415 @@
+From 2801d2792ea6f16706c310a4cfb1554c4084bcf2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 20 Oct 2026 00:20:44 +0000
+Subject: [PATCH 11/13] feat: let separately compiled mods provide message
+ services
+
+MessageService is internal, so a mod assembly cannot derive from it.
+Mods now derive from the public ModMessageService (a plain object with
+[MessageHandler] methods, SendToSocket and GetSocketAccount) and
+register the type in the existing game/login message service
+registries. When at least one is registered, the service factory adds
+one internal ModMessageServiceHost per session: a real MessageService
+child of the SessionActor whose MessageHandlers include the mod
+services' message types, so the session's own dispatch table routes
+those messages to it. The host creates the mod services and calls their
+handlers on its actor thread; a constructor or handler exception is
+logged against the mod and does not stop the session.
+
+ReceiveProtocolDispatcher.MessageHandlers gets a protected setter so the
+host can publish the merged table. Without mod services the factories
+return their built-in sets unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: [AI session link removed]
+---
+ .../Game/GameServiceFactory.cs                |   2 +-
+ .../Login/LoginServiceFactory.cs              |   2 +-
+ src/Imlight.CoreLib/Modding/ImlightModding.cs |  48 +++-
+ .../Modding/ModMessageService.cs              | 233 ++++++++++++++++++
+ .../Networking/ReceiveProtocolDispatcher.cs   |   2 +-
+ 5 files changed, 275 insertions(+), 12 deletions(-)
+ create mode 100644 src/Imlight.CoreLib/Modding/ModMessageService.cs
+
+diff --git a/src/Imlight.CoreLib/Game/GameServiceFactory.cs b/src/Imlight.CoreLib/Game/GameServiceFactory.cs
+index 41b9b01b..b20dcd63 100644
+--- a/src/Imlight.CoreLib/Game/GameServiceFactory.cs
++++ b/src/Imlight.CoreLib/Game/GameServiceFactory.cs
+@@ -49,7 +49,7 @@ namespace Imlight.CoreLib.Game;
+ public class GameServiceFactory : ServiceFactory {
+ 
+     // Mods add services through ImlightRegistries.GameMessageServices; with no mods the set is unchanged.
+-    protected override HashSet<Type> ServiceTypes { get; set; } = ImlightModding.WithModServices(ImlightRegistries.GameMessageServices, [
++    protected override HashSet<Type> ServiceTypes { get; set; } = ImlightModding.WithModServices(ImlightRegistries.GameMessageServices, typeof(GameModMessageServiceHost), [
+         typeof(ControlService),
+         typeof(AttachService),
+         typeof(AccountService),
+diff --git a/src/Imlight.CoreLib/Login/LoginServiceFactory.cs b/src/Imlight.CoreLib/Login/LoginServiceFactory.cs
+index 4b75c984..9ca7c06a 100644
+--- a/src/Imlight.CoreLib/Login/LoginServiceFactory.cs
++++ b/src/Imlight.CoreLib/Login/LoginServiceFactory.cs
+@@ -49,7 +49,7 @@ namespace Imlight.CoreLib.Login;
+ public class LoginServiceFactory : ServiceFactory {
+ 
+     // Mods add services through ImlightRegistries.LoginMessageServices; with no mods the set is unchanged.
+-    protected override HashSet<Type> ServiceTypes { get; set; } = ImlightModding.WithModServices(ImlightRegistries.LoginMessageServices, [
++    protected override HashSet<Type> ServiceTypes { get; set; } = ImlightModding.WithModServices(ImlightRegistries.LoginMessageServices, typeof(LoginModMessageServiceHost), [
+         typeof(ControlService),
+         typeof(AccountService),
+         typeof(AuthenticatorService),
+diff --git a/src/Imlight.CoreLib/Modding/ImlightModding.cs b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+index 1828162f..baf70a6a 100644
+--- a/src/Imlight.CoreLib/Modding/ImlightModding.cs
++++ b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+@@ -98,22 +98,29 @@ public static class ImlightModding {
+ 
+     /// <summary>
+     /// Validator for <see cref="ImlightRegistries.GameMessageServices"/> and
+-    /// <see cref="ImlightRegistries.LoginMessageServices"/>. Returns null when the type is usable.
++    /// <see cref="ImlightRegistries.LoginMessageServices"/>. Returns null when the type is usable: a
++    /// <see cref="ModMessageService"/> with a public parameterless constructor, or (for code that can see Imlight's
++    /// internals) a MessageService with a public constructor taking a SessionActor.
+     /// </summary>
+     public static string ValidateMessageService(Type type) {
+         if (type is null) {
+             return "the service type is null.";
+         }
+ 
+-        if (!typeof(MessageService).IsAssignableFrom(type)) {
+-            return $"{type.FullName} does not derive from Imlight's MessageService.";
++        var isModService = typeof(ModMessageService).IsAssignableFrom(type);
++        if (!isModService && !typeof(MessageService).IsAssignableFrom(type)) {
++            return $"{type.FullName} does not derive from {nameof(ModMessageService)}.";
+         }
+ 
+         if (type.IsAbstract || type.ContainsGenericParameters) {
+             return $"{type.FullName} must be a concrete, non-generic class.";
+         }
+ 
+-        if (type.GetConstructor([typeof(SessionActor)]) is null) {
++        if (isModService && type.GetConstructor(Type.EmptyTypes) is null) {
++            return $"{type.FullName} needs a public parameterless constructor.";
++        }
++
++        if (!isModService && type.GetConstructor([typeof(SessionActor)]) is null) {
+             return $"{type.FullName} needs a public constructor taking a SessionActor.";
+         }
+ 
+@@ -137,15 +144,22 @@ public static class ImlightModding {
+     }
+ 
+     /// <summary>
+-    /// Adds the message services mods registered under <paramref name="key"/> to a factory's built-in set.
++    /// Adds the message services mods registered under <paramref name="key"/> to a factory's built-in set. A
++    /// MessageService type is added as it is; <see cref="ModMessageService"/> types are carried by
++    /// <paramref name="hostType"/>, which is added once when there is at least one.
+     /// </summary>
+-    internal static HashSet<Type> WithModServices(RegistryKey<Type> key, HashSet<Type> builtIn) {
++    internal static HashSet<Type> WithModServices(RegistryKey<Type> key, Type hostType, HashSet<Type> builtIn) {
+         if (!Registries.TryGet(key, out var registry)) {
+             return builtIn;
+         }
+ 
+         foreach (var entry in registry.Entries) {
+-            if (builtIn.Add(entry.Value)) {
++            var isModService = typeof(ModMessageService).IsAssignableFrom(entry.Value);
++            if (isModService) {
++                builtIn.Add(hostType);
++            }
++
++            if (isModService || builtIn.Add(entry.Value)) {
+                 Logger.Information("Mod {0} added message service {1} ({2}).",
+                     Logger.Args(entry.OwnerModId, entry.Value.FullName, key.Name));
+             }
+@@ -154,6 +168,21 @@ public static class ImlightModding {
+         return builtIn;
+     }
+ 
++    /// <summary>
++    /// The <see cref="ModMessageService"/> registrations under <paramref name="key"/>, in mod load order.
++    /// </summary>
++    internal static IEnumerable<RegistryEntry<Type>> ModServiceEntries(RegistryKey<Type> key) {
++        if (!Registries.TryGet(key, out var registry)) {
++            yield break;
++        }
++
++        foreach (var entry in registry.Entries) {
++            if (typeof(ModMessageService).IsAssignableFrom(entry.Value)) {
++                yield return entry;
++            }
++        }
++    }
++
+     /// <summary>
+     /// Runs a mod-registered command. Returns false when no mod registered the command word.
+     /// </summary>
+@@ -229,11 +258,12 @@ public static class ImlightRegistries {
+ 
+     /// <summary>
+     /// Extra message services attached to every game session. Values are <see cref="Type"/>s deriving from
+-    /// Imlight's MessageService with a public constructor taking a SessionActor.
++    /// <see cref="ModMessageService"/> with a public parameterless constructor (see
++    /// <see cref="ImlightModding.ValidateMessageService"/>).
+     /// </summary>
+     public static RegistryKey<Type> GameMessageServices { get; } = new("imlight:game_message_services");
+ 
+-    /// <summary>Extra message services attached to every login session.</summary>
++    /// <summary>Extra message services attached to every login session. Values as for <see cref="GameMessageServices"/>.</summary>
+     public static RegistryKey<Type> LoginMessageServices { get; } = new("imlight:login_message_services");
+ 
+     /// <summary>
+diff --git a/src/Imlight.CoreLib/Modding/ModMessageService.cs b/src/Imlight.CoreLib/Modding/ModMessageService.cs
+new file mode 100644
+index 00000000..ad020fa4
+--- /dev/null
++++ b/src/Imlight.CoreLib/Modding/ModMessageService.cs
+@@ -0,0 +1,233 @@
++/*
++ * Imlight
++ * Copyright (C) 2025 Revive101
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Affero General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Affero General Public License for more details.
++ *
++ * You should have received a copy of the GNU Affero General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ *
++ * ========================================================================
++ * MOD MESSAGE SERVICES
++ * ========================================================================
++ *
++ * PURPOSE:
++ * Lets separately compiled mods handle session messages. MessageService is internal, so a mod cannot derive
++ * from it; a mod derives from the public ModMessageService instead and registers the type in
++ * ImlightRegistries.GameMessageServices or LoginMessageServices. Each session then gets one internal
++ * ModMessageServiceHost (a real MessageService child of the SessionActor) that creates the mod services and
++ * dispatches messages to their [MessageHandler] methods on its own actor thread.
++ *
++ * USAGE EXAMPLE:
++ * public sealed class MenuReplies : ModMessageService {
++ *     [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS))]
++ *     private void OnReply(GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS message) { ... }
++ * }
++ * context.Registries.Get(ImlightRegistries.LoginMessageServices).Register("menu", typeof(MenuReplies));
++ *
++ * NOTE:
++ * Mod services are plain objects owned by the host actor: their handlers run synchronously inside the host's
++ * message processing, one message at a time, like any other service. An exception from a mod service is
++ * logged against its mod and does not stop the session or the other services.
++ *
++ * TODO:
++ *
++ * Created by: SpiralLoader contributors
++ * Version: KALI 1.0
++ * Last Updated: 10/20/2026
++ */
++
++using System;
++using System.Collections.Concurrent;
++using System.Collections.Generic;
++using System.Reflection;
++using Imcodec.MessageLayer;
++using Imlight.Common;
++using Imlight.CoreLib.Shared.Networking;
++using Imlight.CoreLib.WizardData.Models.Player;
++using SpiralLoader.Api.Registries;
++
++namespace Imlight.CoreLib.Modding;
++
++/// <summary>
++/// Base class for a message service provided by a mod. Register the derived type in
++/// <see cref="ImlightRegistries.GameMessageServices"/> or <see cref="ImlightRegistries.LoginMessageServices"/>;
++/// Imlight creates one instance per session (public parameterless constructor) and calls its
++/// <see cref="MessageHandlerAttribute"/> methods for the client and server messages they declare, exactly as it
++/// does for its own services.
++/// </summary>
++/// <remarks>
++/// Handlers run on the session's actor thread, one message at a time. Do not block, and do not use an instance
++/// from another thread. Handler methods must be declared on the registered type itself or be non-private on a
++/// base class. The session helpers below are available from the first handler call onwards, not in the
++/// constructor.
++/// </remarks>
++public abstract class ModMessageService {
++
++    private ModMessageServiceHost _host;
++
++    /// <summary>The id of the mod that registered this service.</summary>
++    protected string OwnerModId { get; private set; }
++
++    /// <summary>The id of the session (client connection) this instance belongs to.</summary>
++    protected ushort SessionId => Host.SessionId;
++
++    private ModMessageServiceHost Host
++        => _host ?? throw new InvalidOperationException(
++            $"{GetType().FullName} is not attached to a session yet; use the session helpers from message handlers.");
++
++    /// <summary>Sends a message to this session's client.</summary>
++    protected void SendToSocket(IMessage message) {
++        ArgumentNullException.ThrowIfNull(message);
++        Host.SendToClient(message);
++    }
++
++    /// <summary>
++    /// The account connected to this session. Asked once from the session's account service (the same ask
++    /// Imlight's own services make) and then cached.
++    /// </summary>
++    protected Account GetSocketAccount() => Host.GetAccount();
++
++    /// <summary>
++    /// Called once when the session ends, while the session's other services still run (Imlight's pre-dispose
++    /// step, which waits at most two seconds for all services). Release per-session state here; keep it short.
++    /// </summary>
++    protected virtual void OnSessionEnded() { }
++
++    internal void Attach(ModMessageServiceHost host, string ownerModId) {
++        _host = host;
++        OwnerModId = ownerModId;
++    }
++
++    internal void NotifySessionEnded() => OnSessionEnded();
++
++}
++
++/// <summary>
++/// The MessageService that carries a session's mod services. Added to a service factory once when at least one
++/// <see cref="ModMessageService"/> type is registered for it; absent otherwise.
++/// </summary>
++internal abstract class ModMessageServiceHost : MessageService {
++
++    private static readonly ConcurrentDictionary<Type, ServiceSet> s_serviceSets = new();
++
++    private readonly List<(ModMessageService Service, string OwnerModId)> _services = [];
++    private Account _account;
++
++    protected ModMessageServiceHost(SessionActor sessionActor, RegistryKey<Type> key) : base(sessionActor) {
++        var set = s_serviceSets.GetOrAdd(GetType(), hostType => ServiceSet.Build(hostType, key));
++
++        // The session's dispatch table is built from these keys, so it routes the mod services' messages here.
++        MessageHandlers = set.MessageHandlers;
++
++        foreach (var (type, ownerModId) in set.Services) {
++            try {
++                var service = (ModMessageService) Activator.CreateInstance(type);
++                service.Attach(this, ownerModId);
++                _services.Add((service, ownerModId));
++            } catch (Exception ex) {
++                var cause = ex is TargetInvocationException { InnerException: not null } ? ex.InnerException : ex;
++                Logger.Error("Message service {0} of mod {1} could not be created for session {2} and is disabled " +
++                             "for it: {3}", Logger.Args(type.FullName, ownerModId, sessionActor.SessionID, cause));
++            }
++        }
++    }
++
++    internal ushort SessionId => SessionActor.SessionID;
++
++    internal void SendToClient(IMessage message) => SendToSocket(message);
++
++    internal Account GetAccount() => _account ??= GetSocketAccount();
++
++    protected override void ConfigureReceivers() => Receive<object>(Dispatch);
++
++    // Pre-dispose rather than dispose: the session waits for every service's pre-dispose reply, but stops its
++    // children right after telling them MSG_DISPOSE, so a dispose message can be dropped.
++    protected override void OnPreDispose() {
++        foreach (var (service, ownerModId) in _services) {
++            try {
++                service.NotifySessionEnded();
++            } catch (Exception ex) {
++                Logger.Error("Message service {0} of mod {1} failed while its session ended: {2}",
++                    Logger.Args(service.GetType().FullName, ownerModId, ex));
++            }
++        }
++
++        base.OnPreDispose();
++    }
++
++    private void Dispatch(object message) {
++        var messageType = message.GetType();
++        var handled = false;
++
++        // The host's own MessageService handlers (identity, dispose) first.
++        var own = MessageHandlerTable.DispatcherFor(GetType(), messageType);
++        if (own is not null) {
++            own(this, message);
++            handled = true;
++        }
++
++        foreach (var (service, ownerModId) in _services) {
++            var handler = MessageHandlerTable.DispatcherFor(service.GetType(), messageType);
++            if (handler is null) {
++                continue;
++            }
++
++            handled = true;
++            try {
++                handler(service, message);
++            } catch (Exception ex) {
++                Logger.Error("Message service {0} of mod {1} failed to handle {2}: {3}",
++                    Logger.Args(service.GetType().FullName, ownerModId, messageType.Name, ex));
++            }
++        }
++
++        if (!handled) {
++            Unhandled(message);
++        }
++    }
++
++    /// <summary>The registered mod service types of one host type, and the message types they handle.</summary>
++    private sealed class ServiceSet {
++
++        public (Type Type, string OwnerModId)[] Services { get; private init; }
++        public Dictionary<Type, MethodInfo> MessageHandlers { get; private init; }
++
++        public static ServiceSet Build(Type hostType, RegistryKey<Type> key) {
++            // Registrations are closed by the time any session exists, so the set is built once and only read.
++            var services = new List<(Type, string)>();
++            var handlers = new Dictionary<Type, MethodInfo>(MessageHandlerTable.HandlersOf(hostType));
++            var seen = new HashSet<Type>();
++            foreach (var entry in ImlightModding.ModServiceEntries(key)) {
++                if (!seen.Add(entry.Value)) {
++                    continue;
++                }
++
++                services.Add((entry.Value, entry.OwnerModId));
++                foreach (var (messageType, method) in MessageHandlerTable.HandlersOf(entry.Value)) {
++                    handlers.TryAdd(messageType, method);
++                }
++            }
++
++            return new ServiceSet { Services = [.. services], MessageHandlers = handlers };
++        }
++
++    }
++
++}
++
++/// <summary>Carries the game sessions' mod services.</summary>
++internal sealed class GameModMessageServiceHost(SessionActor sessionActor)
++    : ModMessageServiceHost(sessionActor, ImlightRegistries.GameMessageServices);
++
++/// <summary>Carries the login sessions' mod services.</summary>
++internal sealed class LoginModMessageServiceHost(SessionActor sessionActor)
++    : ModMessageServiceHost(sessionActor, ImlightRegistries.LoginMessageServices);
+diff --git a/src/Imlight.CoreLib/Shared/Networking/ReceiveProtocolDispatcher.cs b/src/Imlight.CoreLib/Shared/Networking/ReceiveProtocolDispatcher.cs
+index 7f396bae..411a6dc4 100644
+--- a/src/Imlight.CoreLib/Shared/Networking/ReceiveProtocolDispatcher.cs
++++ b/src/Imlight.CoreLib/Shared/Networking/ReceiveProtocolDispatcher.cs
+@@ -62,7 +62,7 @@ public class InternalMessageHandlerAttribute(Type messageType) : MessageHandlerA
+ /// </summary>
+ public class ReceiveProtocolDispatcher : ReceiveActor {
+ 
+-    public Dictionary<Type, MethodInfo> MessageHandlers { get; private set; }
++    public Dictionary<Type, MethodInfo> MessageHandlers { get; protected set; }
+ 
+     protected ReceiveProtocolDispatcher() {
+         MessageHandlers = MessageHandlerTable.HandlersOf(GetType());
+-- 
+2.43.0
+

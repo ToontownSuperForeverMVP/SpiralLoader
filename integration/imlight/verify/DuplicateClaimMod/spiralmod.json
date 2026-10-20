@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "duplicate-claim-verify",
+  "version": "1.0.0",
+  "name": "Duplicate Job Claim Verification",
+  "description": "Registers a service and a job id, then claims client-process-verify's job id, which fails its initialization.",
+  "entrypoints": { "server": ["DuplicateClaimVerifyMod.DuplicateClaimMod"] },
+  "assemblies": ["DuplicateClaimVerifyMod.dll"],
+  "depends": { "spiralloader": ">=0.1.0", "imlight": "^1.2.0" },
+  "loadAfter": ["client-process-verify"]
+}

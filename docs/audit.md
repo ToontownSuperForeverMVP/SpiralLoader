@@ -50,7 +50,7 @@ realm) → player database + admin account → (HEAD only: `LoginWarmup.Run()`, 
 
 | Mechanism | Discovery | Base type visibility | Usable from a separately compiled assembly? |
 | --- | --- | --- | --- |
-| Message services | Hard-coded `HashSet<Type>` in `GameServiceFactory` / `LoginServiceFactory` | `MessageService` is **internal** | No (needs a factory hook and access to an internal base) |
+| Message services | Hard-coded `HashSet<Type>` in `GameServiceFactory` / `LoginServiceFactory` | `MessageService` is **internal** | No (needs a factory hook and access to an internal base). **Patches 0003 + 0011/0012** add the factory hook and the public `ModMessageService` bridge |
 | Requirement handlers | `RequirementDispatcher` static ctor scans `AppDomain.CurrentDomain.GetAssemblies()` | `BaseRequirementHandler<T>` public | Yes, if the assembly is loaded before first use; first match wins, order unspecified |
 | Result handlers | `ResultDispatcher` static ctor, same scan | `BaseResultHandler<T>` public | Same as above |
 | Zone entity components | `ZoneEntityComponentRegistry` static ctor, same scan | `ZoneEntityComponent` public, `IComponentFactory` **internal** | No (the marker interface is internal) |
@@ -79,7 +79,15 @@ verification harness passes on both. Behaviour differences the hooks tolerate:
   `NoZonesAvailable`. The `GameServerSelectingEvent` patch consists of pure insertions around that code, so it
   does not conflict with the upstream rewrite and a mod's chosen realm bypasses `GetGameServer` once.
 - `SendErrorToSocket` at HEAD no longer closes the session; a veto or unknown realm still sends
-  `MSG_CHARACTERSELECTED { Error = 1 }`.
+  `MSG_CHARACTERSELECTED { Error = 1 }`. At the pin it calls `CloseSession()`, so the same veto closes the session
+  there (correction to the milestone 2 wording, which said the session always closes; the harness now asserts
+  both).
+- `SessionActor`'s supervisor (`AllForOneStrategy`) answers an unknown service exception with `Stop` at the pin
+  (every service of the session stops) and `Resume` at HEAD. The mod service host catches mod exceptions itself,
+  so mod faults behave the same on both.
+- `SessionActor.Dispose` (both revisions) waits for every service's `MSG_PREDISPOSE` reply, then tells
+  `MSG_DISPOSE` and stops itself, which stops its children; a child can be stopped before it processes
+  `MSG_DISPOSE`. Observed in the harness; `ModMessageService.OnSessionEnded` therefore runs at pre-dispose.
 
 ## 2. Spiral Shuffle
 
@@ -128,8 +136,8 @@ draws random ids in `[1, int.MaxValue)`, which can collide with a mod's claimed 
 
 | Spiral Shuffle change | Purpose | SpiralLoader mechanism | Status |
 | --- | --- | --- | --- |
-| `GameServiceFactory`: add `EnemyInspectorService` | new per-session service | `ImlightRegistries.GameMessageServices` | Implemented (needs access to internal `MessageService`, below) |
-| `CharacterService`: new `MSG_MESSAGE_PROCESS` handler for the menu choice | handle client Lua reply on login | `ImlightRegistries.LoginMessageServices` (a mod service receives the fanned-out packet) | Implemented (same caveat) |
+| `GameServiceFactory`: add `EnemyInspectorService` | new per-session service | `ModMessageService` in `ImlightRegistries.GameMessageServices` | Implemented (API 1.2.0; harness-verified, see integration README) |
+| `CharacterService`: new `MSG_MESSAGE_PROCESS` handler for the menu choice | handle client Lua reply on login | `ModMessageService` in `ImlightRegistries.LoginMessageServices`; replies for the mod's claimed job id are routed only to that mod | Implemented (API 1.2.0; harness-verified with a synthetic reply, no real client) |
 | `LootGranter`: `RandomizeLoot` before granting | change drops and gold | `LootGrantingEvent` | Implemented |
 | Copy `RandomizerLevelRequirement` (`ReqMagicLevel` handler) | requirement Imlight lacks | Existing AppDomain scan of `BaseRequirementHandler<T>` (mod assemblies load before the scan) | Works in principle; uses internal `NumericRequirement`; unverified without a full build |
 | `MinigameService`: ignore the inspector's job id | avoid fan-out collision | `ImlightRegistries.ClientProcessJobs` (+ `ProcessSupervisor` never allocates claimed ids) | Implemented (API 1.1.0; compile-unverified call sites, see integration README) |
@@ -151,8 +159,12 @@ draws random ids in `[1, int.MaxValue)`, which can collide with a mod's claimed 
 
 Spiral Shuffle is compiled *into* `Imlight.CoreLib`, so it freely uses `internal` members. Verified examples:
 `MessageService`, `NumericRequirement`, `IComponentFactory`, and its own `internal` classes calling into
-Imlight's. A separately compiled mod cannot see internal members. The full list a port needs is part of the
-next milestone. Options, in order of preference:
+Imlight's. A separately compiled mod cannot see internal members. The milestone 2 local run confirmed this for
+`MessageService` (a mod deriving from it does not compile against the real `Imlight.CoreLib`); the cloud harness
+had hidden it with a public stub. **Resolved for message services by option 1:** patches 0011/0012 add the public
+`ModMessageService` bridge, and the harness now compiles the real, internal `MessageService`. The rest of the list
+a port needs (`NumericRequirement`, `IComponentFactory`, …) is part of the next milestone. Options, in order of
+preference:
 
 1. Make the specific members a mod needs public in Imlight (upstream change), or expose them through
    SpiralLoader-owned public wrappers added by the patch series.
@@ -167,7 +179,7 @@ Mods that touch internals should pin `compatibility.imlightCommits`.
 - Imlight has no semantic version; identity is the git commit. The patched Director stamps it into
   assembly metadata (`ImlightCommit`) at build time.
 - SpiralLoader exposes `imlight` as a built-in dependency whose version is
-  `ImlightModding.IntegrationApiVersion` (currently `1.1.0`): the version of the hook surface, not of Imlight.
+  `ImlightModding.IntegrationApiVersion` (currently `1.2.0`): the version of the hook surface, not of Imlight.
 - Wizard101 client data must match the server's `GameRevision`. Spiral Shuffle requires
   `r806919.Wizard_1_610`; mods declare this in `compatibility.clientRevisions`.
 - .NET 10 SDK everywhere (Imcodec's `global.json` asks for `10.0.0`, `rollForward: latestMinor`).

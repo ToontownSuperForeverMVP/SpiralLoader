@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- A mod built against the verification harness: registers a game message service and subscribes to events. -->
+  <!-- A mod built against the verification harness: subscribes to the lifecycle and login events. -->
   <Import Project="$(SpiralLoaderRepoRoot)build/SpiralLoader.Mod.props" />
   <PropertyGroup>
     <SpiralModId>imlight-verify</SpiralModId>

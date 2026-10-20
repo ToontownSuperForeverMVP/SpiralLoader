@@ -1,7 +1,7 @@
-From eb545a3ba0b358ed485052a96cc202844c0a8ca3 Mon Sep 17 00:00:00 2001
+From be96844421e04c810dcd12054256597e6ddffd86 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 16:48:09 +0000
-Subject: [PATCH 10/10] feat: raise the mod integration API to 1.1.0
+Subject: [PATCH 10/13] feat: raise the mod integration API to 1.1.0
 
 Adds CharacterListSentEvent, GameServerSelectingEvent and the
 imlight:client_process_jobs registry. Mods that need them depend on

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "client-process-verify",
+  "version": "1.0.0",
+  "name": "Client Process Bridge Verification",
+  "description": "Claims client process job ids, starts the menu process from CharacterListSentEvent and handles the client's replies through ModMessageService.",
+  "entrypoints": { "server": ["ClientProcessVerifyMod.ClientProcessMod"] },
+  "assemblies": ["ClientProcessVerifyMod.dll"],
+  "depends": { "spiralloader": ">=0.1.0", "imlight": "^1.2.0" }
+}

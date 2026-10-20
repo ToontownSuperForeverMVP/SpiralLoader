@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Imlight patch verification harness. Compiles the REAL patched Imlight Director Program.cs and the new or
-    changed CoreLib files that do not need Imcodec, against functional stubs for everything that does, then
-    runs Program.Main. This proves, without Wizard101 data or Imcodec type dumps, that the patched Director
-    boots SpiralLoader, routes its logs through Imlight's Logger, publishes lifecycle events, and merges
-    mod-registered message services into Imlight's service factories.
+    Imlight patch verification harness. Compiles the REAL patched Imlight Director Program.cs, the modding files,
+    the session plumbing (SessionActor, MessageService, ReceiveProtocolDispatcher, MessageHandlerTable) and the
+    hook call-site services against functional stubs for the Imcodec-generated types, sockets and databases, then
+    runs Program.Main. Scenarios.cs drives real sessions with synthetic client packets. Separately compiled test
+    mods (VerifyMod, ClientProcessMod, IsolationMod, DuplicateClaimMod) see only the public surface, as a mod
+    built against Imlight.CoreLib would.
 
     It does NOT prove that the patched Imlight.CoreLib compiles as a whole (call sites in LootGranter and
     CommandDispatcher are not compiled here). That requires a local build with the Imcodec type dump.
@@ -36,12 +37,20 @@
     <Compile Include="$(_Imlight)Imlight.Director/ResourceContainer.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Modding/ImlightModding.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Modding/ImlightEvents.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Modding/ModMessageService.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Utilities/AssemblyTypes.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Game/Zone/Core/ZoneEntityComponentRegistry.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Game/GameServiceFactory.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Login/LoginServiceFactory.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/ServiceFactory.cs" />
     <!-- Real Imlight files for the hook call sites (their Imcodec-generated dependencies are stubbed in Stubs.cs). -->
+    <!-- The real session plumbing: a client packet goes SessionActor.HandlePacket -> dispatch table -> service. -->
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/SessionActor.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/MessageService.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/Exceptions.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/IHandshakeService.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Packets/ACCOUNT_104_PROTOCOL.cs" />
+    <Compile Include="$(_Imlight)Imlight.CoreLib/WizardData/Models/Misc/OnlinePlayer.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/ReceiveProtocolDispatcher.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/MessageHandlerTable.cs" />
     <Compile Include="$(_Imlight)Imlight.CoreLib/Shared/Networking/ServerInterfaces.cs" />

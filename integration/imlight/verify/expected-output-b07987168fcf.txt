@@ -1,0 +1,2 @@
+VERIFY: scenario select veto-user server-asks=[] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=1,port=0)] closed-by-imlight=True
+VERIFY: scenario select unknown-realm-user server-asks=[MSG_QUERYREALMSERVER(Nowhere)] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=1,port=0)] closed-by-imlight=True
