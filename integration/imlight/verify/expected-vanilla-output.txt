@@ -10,6 +10,10 @@ VERIFY: scenario game-replies socket=[]
 VERIFY: scenario game-replies minigame-decoded=[inspect:42,isolation:ping,rolled-back,unclaimed,boom,after-fault]
 VERIFY: scenario close game-user closed=True
 VERIFY: scenarios done
+future-api-verify 1.0.0 [Disabled]
+mod.disabled: Disabled by configuration.
+, 0 failed.
+!dependency.version_mismatch
 !added message service
 !ModMessageServiceHost
 !session ended

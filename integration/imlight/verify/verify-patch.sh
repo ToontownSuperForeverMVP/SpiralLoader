@@ -16,7 +16,11 @@ COMMIT="${IMLIGHT_COMMIT:-b07987168fcfa2d123a5d78df90ca0c76405e427}"
 IMLIGHT_DIR="${IMLIGHT_DIR:-$REPO_ROOT/external/Imlight-verify-${COMMIT:0:12}}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
 VERIFY_MODS=(VerifyMod ClientProcessMod IsolationMod DuplicateClaimMod)
-CLIENT_PROCESS_MODS="client-process-verify, isolation-verify, duplicate-claim-verify"
+# Disabled for the vanilla run: the client-process mods, and the data mod that needs a newer integration API than the
+# Director provides (under the Abort policy a rejected mod would stop startup; disabling it must not).
+CLIENT_PROCESS_MODS="client-process-verify, isolation-verify, duplicate-claim-verify, future-api-verify"
+# The newest recorded baseline of the public Imlight.CoreLib.Modding surface.
+API_BASELINE="$(ls -d "$REPO_ROOT"/api-baseline/*/ | sort -V | tail -1)Imlight.CoreLib.Modding.txt"
 
 IMLIGHT_COMMIT="$COMMIT" "$REPO_ROOT/integration/imlight/setup-imlight.sh" --no-submodules "$IMLIGHT_DIR"
 
@@ -36,6 +40,7 @@ run_director() {
     mkdir -p "$RUN_DIR/mods"
     cp -R "$REPO_ROOT/artifacts/mods/hello-spiral" "$RUN_DIR/mods/"
     cp -R "$VERIFY_DIR/bin/mods/"* "$RUN_DIR/mods/"
+    cp -R "$VERIFY_DIR/DataMods/"* "$RUN_DIR/mods/"
     sed -e "s/^FailurePolicy = .*/FailurePolicy = $policy/" -e "s/^DisabledMods =.*/DisabledMods = $disabled/" \
         "$INI.original" >"$INI"
 
@@ -88,7 +93,7 @@ VANILLA="$(mktemp)"
 
 run_director "$MODDED" Continue ""
 echo "Checking patched Director with mods ($COMMIT):"
-check "$MODDED" "$VERIFY_DIR/expected-output.txt" "$VERIFY_DIR/expected-output-${COMMIT:0:12}.txt"
+check "$MODDED" "$VERIFY_DIR/expected-output.txt" "$VERIFY_DIR/expected-output-${COMMIT:0:12}.txt" "$API_BASELINE"
 if [ -f "$RUN_DIR/moddata/default/hello-spiral/started.txt" ]; then
     echo "  ok   hello-spiral wrote moddata/default/hello-spiral/started.txt"
 else

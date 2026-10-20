@@ -1,0 +1,36 @@
+surface Imlight.CoreLib.Modding integration API 1.2.0
+Imlight.CoreLib.Modding.CharacterListSentEvent :: public ctor(Imlight.CoreLib.WizardData.Models.Player.Account account, System.Action<Imcodec.MessageLayer.IMessage> send)
+Imlight.CoreLib.Modding.CharacterListSentEvent :: public method System.Void Send(Imcodec.MessageLayer.IMessage message)
+Imlight.CoreLib.Modding.CharacterListSentEvent :: public property Imlight.CoreLib.WizardData.Models.Player.Account Account { get; }
+Imlight.CoreLib.Modding.CharacterListSentEvent :: type public sealed class
+Imlight.CoreLib.Modding.GameServerSelectingEvent :: public ctor(Imlight.CoreLib.WizardData.Models.Player.Account account, Imlight.CoreLib.WizardData.Models.Player.Wizard character)
+Imlight.CoreLib.Modding.GameServerSelectingEvent :: public property Imlight.CoreLib.WizardData.Models.Player.Account Account { get; }
+Imlight.CoreLib.Modding.GameServerSelectingEvent :: public property Imlight.CoreLib.WizardData.Models.Player.Wizard Character { get; }
+Imlight.CoreLib.Modding.GameServerSelectingEvent :: public property System.String RealmName { get; set; }
+Imlight.CoreLib.Modding.GameServerSelectingEvent :: type public sealed class : SpiralLoader.Api.Events.CancellableEvent
+Imlight.CoreLib.Modding.ImlightModding :: public const field System.String IntegrationApiVersion = "1.2.0"
+Imlight.CoreLib.Modding.ImlightModding :: public static method System.Boolean IsClientProcessJobClaimed(System.UInt32 jobId)
+Imlight.CoreLib.Modding.ImlightModding :: public static method System.String ValidateClientProcessJob(System.UInt32 jobId)
+Imlight.CoreLib.Modding.ImlightModding :: public static method System.String ValidateMessageService(System.Type type)
+Imlight.CoreLib.Modding.ImlightModding :: public static method System.Void Attach(SpiralLoader.Api.Events.IEventBus events, SpiralLoader.Api.Registries.IRegistryProvider registries)
+Imlight.CoreLib.Modding.ImlightModding :: public static property SpiralLoader.Api.Events.IEventBus Events { get; }
+Imlight.CoreLib.Modding.ImlightModding :: public static property SpiralLoader.Api.Registries.IRegistryProvider Registries { get; }
+Imlight.CoreLib.Modding.ImlightModding :: public static property System.Boolean IsAttached { get; }
+Imlight.CoreLib.Modding.ImlightModding :: type public static class
+Imlight.CoreLib.Modding.ImlightRegistries :: public static property SpiralLoader.Api.Registries.RegistryKey<System.Type> GameMessageServices { get; } = "imlight:game_message_services"
+Imlight.CoreLib.Modding.ImlightRegistries :: public static property SpiralLoader.Api.Registries.RegistryKey<System.Type> LoginMessageServices { get; } = "imlight:login_message_services"
+Imlight.CoreLib.Modding.ImlightRegistries :: public static property SpiralLoader.Api.Registries.RegistryKey<System.UInt32> ClientProcessJobs { get; } = "imlight:client_process_jobs"
+Imlight.CoreLib.Modding.ImlightRegistries :: type public static class
+Imlight.CoreLib.Modding.LootGrantingEvent :: public ctor(Akka.Actor.IActorRef playerActor, Imlight.CoreLib.WizardData.Models.Player.Wizard wizard, Imlight.CoreLib.WizardData.Models.World.DropTableResult results)
+Imlight.CoreLib.Modding.LootGrantingEvent :: public property Akka.Actor.IActorRef PlayerActor { get; }
+Imlight.CoreLib.Modding.LootGrantingEvent :: public property Imlight.CoreLib.WizardData.Models.Player.Wizard Wizard { get; }
+Imlight.CoreLib.Modding.LootGrantingEvent :: public property Imlight.CoreLib.WizardData.Models.World.DropTableResult Results { get; }
+Imlight.CoreLib.Modding.LootGrantingEvent :: type public sealed class
+Imlight.CoreLib.Modding.ModMessageService :: protected ctor()
+Imlight.CoreLib.Modding.ModMessageService :: protected method Imlight.CoreLib.WizardData.Models.Player.Account GetSocketAccount()
+Imlight.CoreLib.Modding.ModMessageService :: protected method System.Void SendToSocket(Imcodec.MessageLayer.IMessage message)
+Imlight.CoreLib.Modding.ModMessageService :: protected method System.Void StartClientProcess(System.UInt32 jobId, System.String scriptName)
+Imlight.CoreLib.Modding.ModMessageService :: protected property System.String OwnerModId { get; }
+Imlight.CoreLib.Modding.ModMessageService :: protected property System.UInt16 SessionId { get; }
+Imlight.CoreLib.Modding.ModMessageService :: protected virtual method System.Void OnSessionEnded()
+Imlight.CoreLib.Modding.ModMessageService :: type public abstract class
