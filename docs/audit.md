@@ -1,4 +1,4 @@
-# Audit: Imlight and Spiral Shuffle (milestone 1)
+# Audit: Imlight and Spiral Shuffle
 
 Audited 2026-10-19. Every statement here was checked against the source trees named below; line references
 drift, so search for the quoted identifiers.
@@ -23,8 +23,13 @@ drift, so search for the quoted identifiers.
   `ResultList`, `GAME_5_PROTOCOL`, `MG2_MESSAGES_43_PROTOCOL`, and so on.
 - `Imlight.Common` has no Imcodec dependency and builds from a clean clone.
 - Package drift: `Imlight.Common` uses Akka 1.5.12 / Akka.Remote **1.5.0**; CoreLib and Director use 1.5.33.
-  NuGet reports Akka.Remote 1.5.0 as having a critical advisory (GHSA-jhpv-4q4f-43g5, NU1904). Upstream issue,
-  not changed by SpiralLoader.
+  Both Akka.Remote versions are below 1.5.52 and are affected by the critical upstream advisory
+  [GHSA-jhpv-4q4f-43g5 / CVE-2025-61778](https://github.com/advisories/GHSA-jhpv-4q4f-43g5): TLS-enabled
+  Akka.Remote did not require the outbound peer to present its certificate, so certificate-based authentication
+  was not mutual. Akka.NET lists 1.5.52 as patched. The advisory says this specific issue does not affect an
+  application that does not use TLS or runs only on a private network it fully controls; operators must assess
+  their own configuration. This is an upstream dependency issue, not fixed by SpiralLoader. The full patched
+  builds reported NuGet audit warnings; they were not hidden or treated as build errors.
 - Configuration: `Config/Imlight.ini` via `ConfigurationManager` (sections, `GetSection`, `GetSetting("Section.Key")`).
   The shipped `GameRevision` is `r803238.Wizard_1_610`; Spiral Shuffle overrides it to `r806919.Wizard_1_610`.
 - Logging: static `Imlight.Common.Logger` (`Information(string, object[]?)`, `{0}`-style templates, Serilog
