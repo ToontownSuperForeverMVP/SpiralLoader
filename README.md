@@ -1,63 +1,103 @@
 # SpiralLoader
 
-A modloader for [Revive101's Imlight](https://github.com/Revive101/Imlight) Wizard101 private-server framework,
-in the spirit of Fabric for Minecraft: a small loader, a stable mod API, and a maintained set of hook points in
-the server. Mods are separately compiled .NET 10 assemblies plus data, described by a `spiralmod.json`
-manifest and loaded once at server start.
+**An experimental, Fabric-inspired mod loader and public mod API for [Imlight](https://github.com/Revive101/Imlight), an open-source private-server framework for a legacy online game.**
 
-> **Status: milestone 2 (integration API 1.2.0).** The loader, API, headless host, Imlight bootstrap and an
-> Imlight patch series exist and are tested, including a public `ModMessageService` bridge through which a
-> separately compiled mod receives its own client process replies. The first acceptance target, running
-> [Spiral Shuffle](https://github.com/ljste/spiral-shuffle) as a standalone mod, still needs the hook points
-> listed in [docs/next-milestone.md](docs/next-milestone.md).
+SpiralLoader gives server mods a defined entry point and API, then connects that API to Imlight through a small, maintained patch series. It is early development software: the server-side loader and the 1.2.0 `ModMessageService` bridge have passed real Windows integration testing, but a complete client gameplay session has **not** been verified.
 
-## What works
+SpiralLoader is not affiliated with the upstream server project or any game publisher. It does not include or provide client files, game assets, extracted game data, or Imcodec's client-derived generator inputs.
 
-- Mod discovery, manifest validation, SemVer dependency resolution (`depends`/`recommends`/`breaks`,
-  `loadAfter`/`loadBefore`), deterministic load order, cycle detection, compatibility pins (Imlight commit,
-  client revision), configurable failure policy.
-- One `AssemblyLoadContext` per mod: host assemblies are shared, dependency mods share their types, private
-  libraries stay private. Restart-required by design (no unloading).
-- Typed event bus (priorities, cancellation, fault isolation, lock-free after startup), namespaced registries,
-  rollback of a failed mod's registrations, lifecycle events, logging.
-- Imlight hooks (patch series): loader start and lifecycle events, mod message services (`ModMessageService`,
-  usable from a separately compiled mod), `LootGrantingEvent`, mod chat commands, `CharacterListSentEvent`,
-  `GameServerSelectingEvent`, a client process job-id registry with per-mod reply routing, tolerant assembly
-  scanning. Verified by booting the real patched Director, with Imlight's real `SessionActor` dispatch, against
-  stubs on both the pinned and the current upstream Imlight commit.
-- Asset declarations for client archives and SpiralDB, with deterministic overlay planning and conflict
-  detection (writing archives is future work).
+## What it provides
 
-## Quick start
+- **Manifest-based mods.** A `spiralmod.json` manifest declares a mod's identity, entry point, assemblies, dependencies, compatibility pins, and asset declarations.
+- **Dependency-aware loading.** Semantic version requirements, optional recommendations, incompatibilities, explicit load ordering, cycle detection, and deterministic resolution.
+- **A small public API.** Lifecycle and gameplay events, commands, namespaced registries, and mod logging are exposed through `SpiralLoader.Api`.
+- **Per-mod loading contexts.** Each mod gets its own .NET `AssemblyLoadContext`; dependencies share types as needed. Failed initialization rolls back that mod's registrations and is reported according to the configured failure policy.
+- **Client-process messages.** With the Imlight 1.2.0 patch series, a separately built mod can claim client-process job IDs, start processes, and receive only the replies belonging to its claims through `ModMessageService`.
+- **A headless development host.** Build and exercise mods without an Imlight server.
+
+Mods are native .NET code and run inside the server process with its permissions. Load contexts and fault handling help organize mods and contain ordinary failures; **they are not a security sandbox**. Mods load at startup and changes require a server restart.
+
+Asset manifests and deterministic overlay planning exist, but SpiralLoader does not currently write or serve client WAD overlays or SpiralDB overlays. [Spiral Shuffle](https://github.com/ljste/spiral-shuffle) is a future server-side porting target; it has not been ported as a SpiralLoader mod.
+
+## Architecture and documentation
+
+The code is split into a dependency-free mod API, a host-agnostic runtime, an Imlight bootstrap, and a headless host. Imlight-specific hook call sites live in the patch series under `integration/imlight/patches`; the runtime does not reference Imlight assemblies.
+
+- [Architecture and runtime behavior](docs/architecture.md)
+- [Mod authoring guide](docs/mod-authoring.md)
+- [Building, testing, and Imlight setup](docs/building.md)
+- [Imlight patch series and verification details](integration/imlight/README.md)
+- [Imlight and Spiral Shuffle source audit](docs/audit.md)
+- [Development roadmap](docs/next-milestone.md)
+- [Milestone 3 Windows test report](MILESTONE3_LOCAL_TEST_RESULTS.md)
+
+## Supported environment and Imlight revisions
+
+- .NET 10 SDK; the repository pins its SDK feature band in `global.json`.
+- Imlight integration API **1.2.0**.
+- Patch application and automated integration verification currently cover Imlight commit `b07987168fcfa2d123a5d78df90ca0c76405e427` and audited `quality-assurance` commit `2a16010e59b95cc449d8e21542fbf38440e06bcf`.
+- Windows is the primary platform. CI also builds and verifies the patch series on Ubuntu.
+
+The Imlight patch verifiers do not require game data. A full Imlight CoreLib/Director build needs Imcodec generator inputs matching the server's client revision. Those inputs are not distributed here and must not be committed to this repository. See [the build guide](docs/building.md) for the distinction between the automated harness and a full local Imlight build.
+
+## Build and test SpiralLoader
+
+Install the .NET 10 SDK, then run from the repository root:
 
 ```powershell
-dotnet build SpiralLoader.sln
-dotnet test SpiralLoader.sln
-dotnet run --project src/SpiralLoader.Host -- --mods artifacts/mods --run "hello world"
-pwsh integration/imlight/verify/Verify-Patch.ps1     # or integration/imlight/verify/verify-patch.sh
+dotnet build SpiralLoader.sln -c Release
+dotnet test SpiralLoader.sln -c Release --no-build
 ```
 
-## Layout
+The current suite contains 153 automated tests. The build also places ready-to-load example mod folders under `artifacts/mods/`.
 
-| Path | Contents |
-| --- | --- |
-| `src/SpiralLoader.Api` | Public mod API (no dependencies) |
-| `src/SpiralLoader.Runtime` | Plugin manager |
-| `src/SpiralLoader.Imlight` | Imlight bootstrap (no Imlight references) |
-| `src/SpiralLoader.Host` | Headless development host |
-| `examples/` | `HelloSpiral` and `HelloSpiral.Addon` example mods |
-| `tests/SpiralLoader.Tests` | xUnit tests |
-| `integration/imlight` | Patch series, setup scripts, verification harness |
-| `build/SpiralLoader.Mod.props/.targets` | MSBuild support for mod projects |
-| `docs/` | [Architecture](docs/architecture.md), [audit](docs/audit.md), [building](docs/building.md), [mod authoring](docs/mod-authoring.md), [next milestone](docs/next-milestone.md) |
+## Build and run HelloSpiral
 
-## Important
+`HelloSpiral` demonstrates a manifest, a server entry point, lifecycle events, a command, a mod API, and an asset declaration.
 
-- **Mods are trusted code.** Native mods run with full access to the server process; SpiralLoader validates
-  and isolates mistakes but is not a sandbox.
-- **No game data here.** SpiralLoader does not distribute Wizard101 assets, client files, or the
-  client-derived inputs Imcodec needs. Building Imlight itself requires obtaining those yourself.
-- Not affiliated with KingsIsle Entertainment or Revive101.
+```powershell
+dotnet build examples/HelloSpiral/HelloSpiral.csproj -c Release
+dotnet run --project src/SpiralLoader.Host -- --mods artifacts/mods --run "hello world" --plan-assets
+```
 
-License: not chosen yet (no LICENSE file). Note that Imlight is AGPL-3.0 and the patch series in
-`integration/imlight/patches` modifies it.
+To load it in Imlight, build and patch a separate Imlight checkout as described in the [Imlight build guide](docs/building.md), then copy `artifacts/mods/hello-spiral` into the `mods/` folder beside `Imlight.Director`. The example asset is a declaration for planning; it is not merged into or served as a client WAD by this release.
+
+## Apply and verify Imlight patches
+
+From the repository root, the setup scripts create an isolated checkout under ignored `external/`, apply the maintained patch series, and run the verification harness:
+
+```powershell
+pwsh integration/imlight/Setup-Imlight.ps1
+pwsh integration/imlight/verify/Verify-Patch.ps1
+pwsh integration/imlight/verify/Verify-Patch.ps1 -Commit 2a16010e59b95cc449d8e21542fbf38440e06bcf
+```
+
+On Linux or macOS, use `integration/imlight/setup-imlight.sh` and `integration/imlight/verify/verify-patch.sh` (set `IMLIGHT_COMMIT` to verify the QA revision). The patch series has 13 commits and is tested on both supported revisions. The harness uses stubs for generated Imcodec and selected Imlight types; the Windows milestone testing additionally built both complete patched Imlight revisions using real locally available generator inputs and exercised the bridge against the resulting assemblies.
+
+## Verification status
+
+The 1.2.0 server integration passed the full 153-test SpiralLoader suite, both patch verifiers on both revisions, full patched Imlight Release builds with real generated types on Windows, external-mod compilation against the real Imlight assemblies, generated message-type checks, synthetic message dispatch and disposal scenarios, and an isolated Director startup with the external mod. Vanilla startup with SpiralLoader disabled was also checked in the isolated Director.
+
+A complete client gameplay session and client-side message round trip have **not** been verified. No installed client was launched or modified. This project is experimental and is not a production-readiness claim.
+
+### Known dependency advisory
+
+The audited Imlight revisions use Akka.Remote versions below 1.5.52. Upstream advisory [GHSA-jhpv-4q4f-43g5 / CVE-2025-61778](https://github.com/advisories/GHSA-jhpv-4q4f-43g5) describes a critical certificate-authentication flaw affecting TLS-enabled Akka.Remote connections before 1.5.52. This is an upstream dependency issue; review the advisory and Imlight's deployment before exposing remoting endpoints. More detail is in [docs/audit.md](docs/audit.md).
+
+## Roadmap
+
+Next: add the remaining narrow Imlight hooks and public wrappers needed to port Spiral Shuffle's server-side systems as a separately compiled mod. Later work includes a WAD overlay writer, patch-server integration, and broader client validation. The roadmap tracks completed and planned work in [docs/next-milestone.md](docs/next-milestone.md).
+
+## Contributing
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), read the relevant design and build docs, and include focused verification results. Do not submit client-derived inputs, game assets, proprietary files, credentials, or local build output.
+
+## License and acknowledgments
+
+SpiralLoader's original project code is offered under **AGPL-3.0-only** (`SPDX-License-Identifier: AGPL-3.0-only`); see [LICENSE](LICENSE). The Imlight patch series is based on [Revive101's Imlight](https://github.com/Revive101/Imlight) and retains its upstream copyright and license notices. Third-party dependencies retain their own licenses. No copyright ownership over third-party code is claimed here. See [third-party notices](THIRD-PARTY-NOTICES.md) for the licensing boundaries.
+
+Thanks to **Revive101** for Imlight and **ljste** for [Spiral Shuffle](https://github.com/ljste/spiral-shuffle), which informs the loader's future integration roadmap. Game names, trademarks, and content belong to their respective owners.
+
+## AI-Assisted Development
+
+SpiralLoader is directed and maintained by a human, with substantial AI assistance from **Claude Opus 5.5**, **Claude Sonnet 5.5**, and **OpenAI GPT-6 Luna High** for implementation, debugging, testing, and documentation. AI assistance contributed substantially to the work; this project does not claim that every line was independently human-authored. Maintainers review and remain responsible for the project and its releases.

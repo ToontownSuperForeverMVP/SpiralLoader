@@ -118,9 +118,11 @@ verification on both.
 
 ## Troubleshooting
 
-- **`NU1904` for Akka.Remote 1.5.0** when building against Imlight: upstream `Imlight.Common` pins a version
-  with a published advisory. SpiralLoader's harness downgrades this to a warning; fixing it is an upstream
-  change.
+- **`NU1904` for Akka.Remote** when building against Imlight: the upstream versions in the supported revisions
+  are below 1.5.52 and fall within critical advisory GHSA-jhpv-4q4f-43g5 / CVE-2025-61778. The harness's
+  separately compiled verification-mod projects mark NU1904 as not-an-error so the tests can finish; the warning
+  remains visible and is not suppressed. Full patched Imlight builds also reported package-audit warnings. See
+  [docs/audit.md](audit.md) for the affected TLS certificate-authentication scenario and upstream fix.
 - **Settings from SpiralLoader leaking into Imlight builds**: checkouts under `external/` are shielded by
   `external/Directory.Build.props`. If you clone Imlight somewhere inside this repository other than
   `external/`, add a similar barrier.
