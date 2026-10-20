@@ -29,9 +29,33 @@ Inside this repository (see `examples/HelloSpiral`):
 </Project>
 ```
 
-Outside the repository, set `SpiralLoaderApiPath` to a `SpiralLoader.Api.dll` and `SpiralModOutputRoot` to
-where the mod folder should be assembled. To use Imlight types, set `ImlightDirectory` to a built (patched)
-Imlight server directory; Imlight, Akka and Imcodec are then referenced without being copied.
+Outside the repository, start from [`examples/standalone-mod`](../examples/standalone-mod): copy the folder
+anywhere (it does not need this repository's build files), and build it against a `SpiralLoader.Api.dll`:
+
+```bash
+# 1. Get SpiralLoader.Api.dll. There is no NuGet package; build it from a SpiralLoader checkout.
+dotnet build path/to/SpiralLoader/src/SpiralLoader.Api -c Release
+#    -> path/to/SpiralLoader/src/SpiralLoader.Api/bin/Release/net10.0/SpiralLoader.Api.dll
+
+# 2. Build your mod. The output folder IS the installable mod (manifest, dll, .deps.json).
+dotnet build -c Release -o out/standalone-mod -p:SpiralLoaderApiPath=path/to/SpiralLoader.Api.dll
+
+# 3. Check that it loads (no server, no game files needed), then install it.
+dotnet path/to/SpiralLoader/src/SpiralLoader.Host/bin/Release/net10.0/SpiralLoader.Host.dll --check --mod out/standalone-mod --run "standalone you"
+cp -r out/standalone-mod  <server>/mods/        # then restart the server
+```
+
+The project file is five meaningful lines: a `<Reference Include="SpiralLoader.Api">` with `<Private>false</Private>`
+(the server provides it; never ship it), `EnableDynamicLoading` (writes the `.deps.json` the loader uses for your
+private NuGet dependencies), and `spiralmod.json` copied to the output. The same project is built and loaded by the
+test suite from a directory outside the repository, so it stays correct.
+`build/SpiralLoader.Mod.props`/`.targets` (used by the in-repo examples) are optional conveniences: they assemble
+`artifacts/mods/<id>` for you.
+
+To use Imlight types, set `ImlightDirectory` to a built (patched) Imlight server directory with the
+`SpiralLoader.Mod.targets` import, or reference `Imlight.CoreLib.dll`, `Imlight.Common.dll`, `Akka.dll` and
+`Imcodec.*.dll` yourself with `Private=false`; they are provided by the server and must not be copied into the
+mod folder.
 
 **Never ship assemblies the host provides** (`SpiralLoader.Api`, Imlight, Akka, Imcodec, framework). The
 `.props/.targets` take care of this; if a copy slips in, the host's copy is used and a warning is logged.
@@ -51,9 +75,62 @@ Minimal:
 }
 ```
 
-Full reference: [architecture.md](architecture.md#manifest-spiralmodjson-schema-1). Depend on `imlight` by
-version when you only use SpiralLoader hooks; add `compatibility.imlightCommits` when you rely on Imlight
-internals, and `compatibility.clientRevisions` when your data targets a specific client build.
+Full reference: [architecture.md](architecture.md#manifest-spiralmodjson-schema-1). Comments and trailing commas
+are allowed in `spiralmod.json`. Add `compatibility.imlightCommits` when you rely on Imlight internals, and
+`compatibility.clientRevisions` when your data targets a specific client build.
+
+### Declaring the versions you need
+
+A mod states what it needs in `depends`. The host provides three ids besides installed mods:
+
+| Id | Version | Declare it when |
+| --- | --- | --- |
+| `spiralloader` | the SpiralLoader API version (`0.1.0` today) | always: the range of `SpiralLoader.Api` you built and tested against |
+| `imlight` | the **Imlight integration API** version (`1.2.0` today) | you use anything from `Imlight.CoreLib.Modding`; the minimum is the version that introduced the newest hook you use |
+| `dotnet` | the .NET runtime version | rarely; for example `>=10.0.0` |
+
+```json
+"depends": {
+  "spiralloader": ">=0.1.0 <0.2.0",
+  "imlight": "^1.2.0"
+}
+```
+
+`"imlight": "^1.2.0"` means "integration API 1.2.0 or any later 1.x": hooks are only ever added in minor versions
+and only removed in a new major version ([api-compatibility.md](api-compatibility.md)). Pick the minimum from the
+table (the newest hook your mod touches decides it):
+
+| Integration API | Added | A mod using it declares |
+| --- | --- | --- |
+| `1.0.0` | Startup loading, lifecycle events, `LootGrantingEvent`, chat commands (`CommonRegistries.Commands`), the game/login service registries (before 1.2 only usable by code that can see Imlight's internal `MessageService`; separately compiled mods use `ModMessageService`) | `"imlight": "^1.0.0"` |
+| `1.1.0` | `CharacterListSentEvent`, `GameServerSelectingEvent`, `ImlightRegistries.ClientProcessJobs` | `"imlight": "^1.1.0"` |
+| `1.2.0` | `ModMessageService`, per-mod routing of client process replies | `"imlight": "^1.2.0"` |
+
+What a server does with the declaration: on a server patched to an older integration API the mod is **rejected at
+startup with `dependency.version_mismatch`** and a message naming the version present, rather than failing later
+with a missing type. On a host with no Imlight at all (the headless host) it is rejected with `dependency.missing`
+unless you pass `--imlight-api`. A mod that only uses SpiralLoader's own API (events, registries, commands) should not
+depend on `imlight` at all, so it also runs on other hosts.
+
+Test the boundaries before you publish a range: `--check --imlight-api 1.2.0` must pass and `--imlight-api 1.1.0`
+must be rejected ([compatibility-testing.md](compatibility-testing.md)).
+
+### What a mod can do today: server-side versus client assets
+
+SpiralLoader mods are **server-side**: managed .NET code in the server process, plus data the server reads. What
+works today:
+
+* Server logic: events and hooks, chat commands, extra per-session message services, claims on client process job
+  ids, custom data in `DataDirectory`/`ConfigDirectory`.
+* Telling an *unmodified* client to do something through messages the server already speaks (for example
+  `MSG_START_CLIENT_PROCESS` for a script the client already has).
+
+What it **cannot** do yet: ship new client content. Declared `wad` and `spiraldb` assets are validated and planned
+(`--plan-assets`) but not written into or served as client archives; there is no installer that puts a Lua script or
+GUI layout in the player's game. A feature that needs a new client script, GUI layout or model needs that client
+asset delivery (planned, see [next-milestone.md](next-milestone.md)) and cannot be completed by a server mod alone.
+Write such a mod so its server half degrades cleanly without the client half, and say in your README which client
+files it expects. Never redistribute game files in a mod.
 
 ## 3. Entrypoint
 
@@ -93,7 +170,13 @@ Change filter-style events by setting their properties. Call `Cancel()` on a `Ca
 lower-priority handlers and the host's default action. Use `EventPriority.Monitor` to observe the final
 state without changing it.
 
-## 5. Imlight hooks (integration API 1.2.0)
+## 5. Testing your mod
+
+Run `SpiralLoader.Host --check --mod <your build output>` locally and in CI; it needs no game files or Imlight
+and reports each problem with a code and a fix. See [compatibility-testing.md](compatibility-testing.md) for the
+options, what it does and does not prove, and the scenarios the project itself tests.
+
+## 6. Imlight hooks (integration API 1.2.0)
 
 Reference `Imlight.CoreLib` (via `ImlightDirectory`) and use `Imlight.CoreLib.Modding`:
 
@@ -221,7 +304,7 @@ Requirement and result handlers deriving from Imlight's public `BaseRequirementH
 `BaseResultHandler<T>` are discovered automatically, because mods load before Imlight scans assemblies. If
 Imlight already handles the same type, which handler wins is unspecified.
 
-## 6. Data (planned)
+## 7. Data (planned)
 
 Declare data now so it is validated and planned:
 
@@ -235,6 +318,6 @@ Declare data now so it is validated and planned:
 Applying WAD and SpiralDB overlays is not implemented yet. `SpiralLoader.Host --plan-assets` shows the merged
 plan and conflicts. Ship only original content: never redistribute Wizard101 files.
 
-## 7. Trust
+## 8. Trust
 
 Mods are trusted native code with full access to the server process. SpiralLoader is not a sandbox.

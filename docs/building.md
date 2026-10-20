@@ -16,9 +16,13 @@ dotnet test SpiralLoader.sln
 ```
 
 `dotnet build` also assembles the example mods into installable folders under `artifacts/mods/`.
-The test suite (153 tests) covers versioning, manifests, dependency resolution and ordering, assembly loading
+The test suite (172 tests) covers versioning, manifests, dependency resolution and ordering, assembly loading
 and failure isolation (with mods compiled at test time by Roslyn), events, registries, asset planning,
-compatibility pins, the Imlight bootstrap, and an out-of-process run of the headless host.
+compatibility pins, the Imlight bootstrap, an out-of-process run of the headless host, the public API baselines
+(`ApiCompatibilityTests`) and external-mod compatibility (`ExternalModCompatibilityTests`: a mod built outside the
+repository with the plain `dotnet` CLI, a committed prebuilt binary, API-version mismatches, disabling an incompatible
+mod, the `--check` command, diagnostics quality). See [compatibility-testing.md](compatibility-testing.md). One test runs
+`dotnet build` on `examples/standalone-mod`; skip it with `--filter "Category!=ExternalBuild"`.
 
 ### Headless host
 
@@ -31,6 +35,26 @@ dotnet run --project src/SpiralLoader.Host -- --help
 
 Exit codes: `0` success, `1` a mod failed (or a `--run` command was not found, or assets conflict), `2` bad
 arguments.
+
+### Checking a mod (no game data)
+
+```powershell
+dotnet run --project src/SpiralLoader.Host -c Release -- --check --mod path\to\my-mod --imlight-api 1.2.0
+```
+
+Loads without aborting at the first failure, runs the lifecycle events, prints a PASS/FAIL verdict with each failure's
+diagnostic code and a `fix:` line. Options and CI usage: [compatibility-testing.md](compatibility-testing.md).
+
+### Public API baselines
+
+`tools/SpiralLoader.ApiSurface` prints and compares public API surfaces against `api-baseline/`:
+
+```powershell
+dotnet build src/SpiralLoader.Api -c Release; dotnet build tools/SpiralLoader.ApiSurface -c Release
+dotnet tools/SpiralLoader.ApiSurface/bin/Release/net10.0/SpiralLoader.ApiSurface.dll check src/SpiralLoader.Api/bin/Release/net10.0/SpiralLoader.Api.dll api-baseline/1.2.0/SpiralLoader.Api.txt --strict
+```
+
+See [api-compatibility.md](api-compatibility.md) for what the baselines mean and how to update them.
 
 ## Imlight integration
 
@@ -108,8 +132,9 @@ cd external/Imlight          # a checkout produced by setup-imlight.sh, on branc
 ```
 
 Then rerun the verification for the pinned commit and current upstream, and update
-`integration/imlight/README.md` if the hook surface changed (bump `ImlightModding.IntegrationApiVersion` on
-breaking changes).
+`integration/imlight/README.md` if the hook surface changed (bump `ImlightModding.IntegrationApiVersion`: minor for
+additions, major for breaks) and record the new `Imlight.CoreLib.Modding` surface under `api-baseline/`
+([api-compatibility.md](api-compatibility.md#checking-and-updating-a-baseline)). The verify scripts fail until you do.
 
 ## Continuous integration
 

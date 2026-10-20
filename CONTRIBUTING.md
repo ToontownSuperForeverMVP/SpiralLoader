@@ -6,7 +6,7 @@ SpiralLoader is experimental software. Contributions should keep its public API 
 
 1. Read [the architecture](docs/architecture.md), [mod-authoring guide](docs/mod-authoring.md), and [build guide](docs/building.md) relevant to your change.
 2. Keep changes focused and explain the user-visible or mod-author-visible effect.
-3. Run the relevant checks. For runtime/API changes, run `dotnet build SpiralLoader.sln -c Release` and `dotnet test SpiralLoader.sln -c Release --no-build`. For Imlight patch changes, also run both patch verifiers against the pinned and audited QA commits as described in [integration/imlight/README.md](integration/imlight/README.md).
+3. Run the relevant checks. For runtime/API changes, run `dotnet build SpiralLoader.sln -c Release` and `dotnet test SpiralLoader.sln -c Release --no-build`. If `ApiCompatibilityTests` or an Imlight baseline check fails, follow [docs/api-compatibility.md](docs/api-compatibility.md) (SemVer table, changelog, new baseline) instead of just regenerating the file. For Imlight patch changes, also run both patch verifiers against the pinned and audited QA commits as described in [integration/imlight/README.md](integration/imlight/README.md).
 4. For Imlight hooks, preserve upstream style and copyright headers, keep hooks inert when there are no subscribers, and do not add Imlight types to the host-agnostic runtime.
 5. Disclose substantial AI assistance in the pull request description when it materially shaped the implementation, debugging, tests, or documentation. A human contributor must review and take responsibility for submitted changes.
 
