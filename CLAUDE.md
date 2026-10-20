@@ -1,7 +1,7 @@
 # CLAUDE.md — SpiralLoader
 
 Modloader for Revive101's Imlight (Wizard101 private server, .NET 10, Akka.NET). Read `docs/architecture.md`
-for design, `docs/audit.md` for Imlight/Spiral Shuffle facts, `docs/next-milestone.md` for what is next.
+for design, `docs/audit.md` for Imlight and modding compatibility research, `docs/next-milestone.md` for the independent project roadmap.
 
 ## Layout and dependency rules
 
@@ -91,4 +91,4 @@ In the cloud container the SDK may not be on PATH: `export PATH=/root/.dotnet:$P
   before Imlight's AppDomain-scanning registries run.
 - Default failure policy is `Abort`: a broken mod stops server startup with the report in the log.
 - Built-in dependency ids: `spiralloader` (API version), `dotnet`, `imlight` (integration API version).
-- Spiral Shuffle (acceptance target) pins Imlight `b07987168fcf…` and client `r806919.Wizard_1_610`.
+- Spiral Shuffle is independent compatibility research only; it is not a porting target or acceptance requirement. The pinned Imlight revision is `b07987168fcfa2d123a5d78df90ca0c76405e427`.

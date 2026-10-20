@@ -1,4 +1,4 @@
-# Audit: Imlight and Spiral Shuffle
+# Imlight integration and modding compatibility research
 
 Audited 2026-10-19. Every statement here was checked against the source trees named below; line references
 drift, so search for the quoted identifiers.
@@ -94,7 +94,9 @@ verification harness passes on both. Behaviour differences the hooks tolerate:
   `MSG_DISPOSE` and stops itself, which stops its children; a child can be stopped before it processes
   `MSG_DISPOSE`. Observed in the harness; `ModMessageService.OnSessionEnded` therefore runs at pre-dispose.
 
-## 2. Spiral Shuffle
+## 2. Spiral Shuffle compatibility reference (not a project deliverable)
+
+This section records an independent project as a technical reference for understanding extension needs. It does not define a planned port, acceptance criterion, or commitment by its maintainer. Any future third-party integration would need to be undertaken by its maintainer or another interested contributor, with appropriate licensing and attribution.
 
 ### What it is
 
@@ -168,7 +170,7 @@ Imlight's. A separately compiled mod cannot see internal members. The milestone 
 `MessageService` (a mod deriving from it does not compile against the real `Imlight.CoreLib`); the cloud harness
 had hidden it with a public stub. **Resolved for message services by option 1:** patches 0011/0012 add the public
 `ModMessageService` bridge, and the harness now compiles the real, internal `MessageService`. The rest of the list
-a port needs (`NumericRequirement`, `IComponentFactory`, …) is part of the next milestone. Options, in order of
+a third-party integration may need (`NumericRequirement`, `IComponentFactory`, …) is an independent extension concern. Options, in order of
 preference:
 
 1. Make the specific members a mod needs public in Imlight (upstream change), or expose them through

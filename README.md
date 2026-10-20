@@ -17,7 +17,7 @@ SpiralLoader is not affiliated with the upstream server project or any game publ
 
 Mods are native .NET code and run inside the server process with its permissions. Load contexts and fault handling help organize mods and contain ordinary failures; **they are not a security sandbox**. Mods load at startup and changes require a server restart.
 
-Asset manifests and deterministic overlay planning exist, but SpiralLoader does not currently write or serve client WAD overlays or SpiralDB overlays. [Spiral Shuffle](https://github.com/ljste/spiral-shuffle) is a future server-side porting target; it has not been ported as a SpiralLoader mod.
+Asset manifests and deterministic overlay planning exist, but SpiralLoader does not currently write or serve client WAD overlays or SpiralDB overlays. Spiral Shuffle is an example of a possible third-party integration; no port is planned or promised by this project.
 
 ## Architecture and documentation
 
@@ -27,7 +27,7 @@ The code is split into a dependency-free mod API, a host-agnostic runtime, an Im
 - [Mod authoring guide](docs/mod-authoring.md)
 - [Building, testing, and Imlight setup](docs/building.md)
 - [Imlight patch series and verification details](integration/imlight/README.md)
-- [Imlight and Spiral Shuffle source audit](docs/audit.md)
+- [Imlight and modding compatibility research](docs/audit.md)
 - [Development roadmap](docs/next-milestone.md)
 - [Milestone 3 Windows test report](MILESTONE3_LOCAL_TEST_RESULTS.md)
 
@@ -86,7 +86,7 @@ The audited Imlight revisions use Akka.Remote versions below 1.5.52. Upstream ad
 
 ## Roadmap
 
-Next: add the remaining narrow Imlight hooks and public wrappers needed to port Spiral Shuffle's server-side systems as a separately compiled mod. Later work includes a WAD overlay writer, patch-server integration, and broader client validation. The roadmap tracks completed and planned work in [docs/next-milestone.md](docs/next-milestone.md).
+The roadmap focuses on stable extension APIs, broader server gameplay hooks, asset and database overlays, developer tooling, and compatibility testing. SpiralLoader is an independent, general-purpose modloading framework; third-party projects may choose to integrate with it. See [the development roadmap](docs/next-milestone.md).
 
 ## Contributing
 
@@ -96,7 +96,7 @@ Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), read t
 
 SpiralLoader's original project code is offered under **AGPL-3.0-only** (`SPDX-License-Identifier: AGPL-3.0-only`); see [LICENSE](LICENSE). The Imlight patch series is based on [Revive101's Imlight](https://github.com/Revive101/Imlight) and retains its upstream copyright and license notices. Third-party dependencies retain their own licenses. No copyright ownership over third-party code is claimed here. See [third-party notices](THIRD-PARTY-NOTICES.md) for the licensing boundaries.
 
-Thanks to **Revive101** for Imlight and **ljste** for [Spiral Shuffle](https://github.com/ljste/spiral-shuffle), which informs the loader's future integration roadmap. Game names, trademarks, and content belong to their respective owners.
+Thanks to **Revive101** for Imlight and **ljste** for [Spiral Shuffle](https://github.com/ljste/spiral-shuffle), whose architecture and extension needs informed compatibility research. Spiral Shuffle remains an independent project; any future integration would be undertaken by its maintainer or another contributor, with no commitment implied.
 
 ## AI-Assisted Development
 

@@ -12,6 +12,6 @@ NuGet packages are declared in project files and restored during builds; this re
 
 ## Referenced projects and excluded material
 
-[Spiral Shuffle](https://github.com/ljste/spiral-shuffle) is acknowledged as a future integration target; its source and assets are not included here. No proprietary client files, game assets, extracted game data, or client-derived Imcodec generator inputs are distributed by this repository.
+[Spiral Shuffle](https://github.com/ljste/spiral-shuffle) is acknowledged as an independent project whose technical needs informed compatibility research; its source and assets are not included here, and no integration commitment is implied. No proprietary client files, game assets, extracted game data, or client-derived Imcodec generator inputs are distributed by this repository.
 
 For SpiralLoader contributions, see [CONTRIBUTING.md](CONTRIBUTING.md). Preserve third-party attribution and licensing when adding dependencies or derived code; do not apply SpiralLoader's default license to material you do not own.
