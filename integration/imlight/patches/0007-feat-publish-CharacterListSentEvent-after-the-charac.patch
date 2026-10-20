@@ -1,7 +1,7 @@
-From 49bb884e6adcc22dfaa595fe2344592ac3d06164 Mon Sep 17 00:00:00 2001
+From 0f6e7b2e982cb2394b8e9a88a0d65ff7bbf42b17 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 16:48:08 +0000
-Subject: [PATCH 07/10] feat: publish CharacterListSentEvent after the
+Subject: [PATCH 07/13] feat: publish CharacterListSentEvent after the
  character list is sent
 
 Mods can follow up the character list with their own client messages,

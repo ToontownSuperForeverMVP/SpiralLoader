@@ -55,11 +55,13 @@ namespace Imcodec.MessageLayer {
         public byte AccessLevel => 0;
     }
 
+    // Records the payload of every client process message MinigameService decodes (it prepends an 8-byte header),
+    // then reports "nothing decoded", which MinigameService logs and drops.
     public static class MessageEncoder {
-        public static int DecodeCalls;
+        public static readonly System.Collections.Concurrent.ConcurrentQueue<string> Decoded = new();
 
         public static List<IMessage> Decode(byte[] data) {
-            System.Threading.Interlocked.Increment(ref DecodeCalls);
+            Decoded.Enqueue(System.Text.Encoding.UTF8.GetString(data, 8, data.Length - 8));
             return [];
         }
     }
@@ -75,6 +77,10 @@ namespace Imcodec.MessageLayer.Generated {
         public sealed class MSG_CLIENT_PROCESS_TERMINATED : WireMessage { public uint JobID; }
         public sealed class MSG_START_CLIENT_PROCESS : WireMessage { public ulong OwnerGID; public uint JobID; public string ScriptName; }
         public sealed class MSG_KILL_CLIENT_PROCESS : WireMessage { public uint JobID; }
+    }
+
+    public static class EXTENDEDBASE_2_PROTOCOL {
+        public sealed class MSG_SERVERMESSAGE : WireMessage { public string Message; public byte Modal; }
     }
 
     public static class WIZARD_12_PROTOCOL {
