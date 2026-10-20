@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "standalone-mod",
+  "version": "1.0.0",
+  "name": "Standalone Mod",
+  "description": "A minimal server-side mod built outside the SpiralLoader repository.",
+  "authors": ["You"],
+  "license": "AGPL-3.0-only",
+  "entrypoints": { "server": ["StandaloneMod.StandaloneEntry"] },
+  "assemblies": ["StandaloneMod.dll"],
+  "depends": {
+    // The SpiralLoader.Api versions you built and tested against.
+    "spiralloader": ">=0.1.0 <0.2.0"
+    // Using Imlight hooks (events, ModMessageService, ...)? Also require the integration API that added them:
+    // , "imlight": "^1.2.0"
+  }
+}

@@ -1,0 +1,7 @@
+<Project>
+  <!--
+    Deliberately empty. This folder is a template meant to be copied OUT of the SpiralLoader repository; inside it,
+    this file stops the repository's own Directory.Build.props (warnings as errors, repo paths) from applying, so
+    the project builds exactly as it will in your own repository.
+  -->
+</Project>

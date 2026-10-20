@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    A complete SpiralLoader mod project that does not depend on the SpiralLoader repository layout.
+    Build:  dotnet build -c Release -o mods/standalone-mod -p:SpiralLoaderApiPath=<path>/SpiralLoader.Api.dll
+    The output folder is the installable mod: copy it into the server's mods/ directory.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>StandaloneMod</AssemblyName>
+    <RootNamespace>StandaloneMod</RootNamespace>
+    <!-- Writes StandaloneMod.deps.json so the loader can find the mod's own NuGet dependencies, if you add any. -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- Where SpiralLoader.Api.dll is: build it once with "dotnet build src/SpiralLoader.Api -c Release". -->
+    <SpiralLoaderApiPath Condition="'$(SpiralLoaderApiPath)' == ''">..\..\src\SpiralLoader.Api\bin\Release\net10.0\SpiralLoader.Api.dll</SpiralLoaderApiPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Private=false: the server provides SpiralLoader.Api at run time. Never ship your own copy. -->
+    <Reference Include="SpiralLoader.Api">
+      <HintPath>$(SpiralLoaderApiPath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- The manifest travels with the build output. -->
+    <None Include="spiralmod.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="CheckSpiralLoaderApi" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(SpiralLoaderApiPath)')"
+           Text="SpiralLoader.Api.dll was not found at '$(SpiralLoaderApiPath)'. Build it (dotnet build src/SpiralLoader.Api -c Release in a SpiralLoader checkout) and pass -p:SpiralLoaderApiPath=&lt;full path to SpiralLoader.Api.dll&gt;." />
+  </Target>
+</Project>

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "api-tour",
+  "version": "1.0.0",
+  "name": "API Tour",
+  "description": "Compatibility fixture built against SpiralLoader.Api 0.1.0.0. Exercises every area of the public API; the 'tour' command reports whether each still behaves.",
+  "authors": ["SpiralLoader contributors"],
+  "license": "AGPL-3.0-only",
+  "entrypoints": { "server": ["ApiTour.TourMod", "ApiTour.MinimalMod"] },
+  "assemblies": ["ApiTour.dll"],
+  "depends": { "spiralloader": ">=0.1.0 <0.2.0" },
+  "recommends": { "not-installed": "*" },
+  "compatibility": { "clientRevisions": [] }
+}
