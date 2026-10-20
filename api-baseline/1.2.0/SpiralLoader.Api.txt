@@ -1,0 +1,207 @@
+surface SpiralLoader.Api 0.1.0.0 (integration API 1.2.0 baseline)
+SpiralLoader.Api.Commands.CommonRegistries :: public static property SpiralLoader.Api.Registries.RegistryKey<SpiralLoader.Api.Commands.ModCommand> Commands { get; } = "spiralloader:commands"
+SpiralLoader.Api.Commands.CommonRegistries :: type public static class
+SpiralLoader.Api.Commands.ModCommand :: public ctor(System.String Name, System.String Description, System.Func<SpiralLoader.Api.Commands.ModCommandInvocation, System.String?> Execute)
+SpiralLoader.Api.Commands.ModCommand :: public method System.Boolean Equals(SpiralLoader.Api.Commands.ModCommand? other)
+SpiralLoader.Api.Commands.ModCommand :: public method System.Void Deconstruct(out System.String Name, out System.String Description, out System.Func<SpiralLoader.Api.Commands.ModCommandInvocation, System.String> Execute)
+SpiralLoader.Api.Commands.ModCommand :: public override method System.Boolean Equals(System.Object? obj)
+SpiralLoader.Api.Commands.ModCommand :: public override method System.Int32 GetHashCode()
+SpiralLoader.Api.Commands.ModCommand :: public override method System.String ToString()
+SpiralLoader.Api.Commands.ModCommand :: public property System.Boolean OperatorOnly { get; init; }
+SpiralLoader.Api.Commands.ModCommand :: public property System.Func<SpiralLoader.Api.Commands.ModCommandInvocation, System.String?> Execute { get; init; }
+SpiralLoader.Api.Commands.ModCommand :: public property System.String Description { get; init; }
+SpiralLoader.Api.Commands.ModCommand :: public property System.String Name { get; init; }
+SpiralLoader.Api.Commands.ModCommand :: type public sealed class : System.IEquatable<SpiralLoader.Api.Commands.ModCommand>
+SpiralLoader.Api.Commands.ModCommandInvocation :: public ctor(System.Collections.Generic.IReadOnlyList<System.String> Arguments, System.String Caller, System.Boolean CallerIsOperator = false)
+SpiralLoader.Api.Commands.ModCommandInvocation :: public method System.Boolean Equals(SpiralLoader.Api.Commands.ModCommandInvocation? other)
+SpiralLoader.Api.Commands.ModCommandInvocation :: public method System.Void Deconstruct(out System.Collections.Generic.IReadOnlyList<System.String> Arguments, out System.String Caller, out System.Boolean CallerIsOperator)
+SpiralLoader.Api.Commands.ModCommandInvocation :: public override method System.Boolean Equals(System.Object? obj)
+SpiralLoader.Api.Commands.ModCommandInvocation :: public override method System.Int32 GetHashCode()
+SpiralLoader.Api.Commands.ModCommandInvocation :: public override method System.String ToString()
+SpiralLoader.Api.Commands.ModCommandInvocation :: public property System.Boolean CallerIsOperator { get; init; }
+SpiralLoader.Api.Commands.ModCommandInvocation :: public property System.Collections.Generic.IReadOnlyList<System.String> Arguments { get; init; }
+SpiralLoader.Api.Commands.ModCommandInvocation :: public property System.String Caller { get; init; }
+SpiralLoader.Api.Commands.ModCommandInvocation :: type public sealed class : System.IEquatable<SpiralLoader.Api.Commands.ModCommandInvocation>
+SpiralLoader.Api.Events.CancellableEvent :: protected ctor()
+SpiralLoader.Api.Events.CancellableEvent :: public method System.Void Cancel()
+SpiralLoader.Api.Events.CancellableEvent :: public property System.Boolean IsCancelled { get; }
+SpiralLoader.Api.Events.CancellableEvent :: type public abstract class
+SpiralLoader.Api.Events.EventPriority :: public const field System.Int32 High = 100
+SpiralLoader.Api.Events.EventPriority :: public const field System.Int32 Highest = 200
+SpiralLoader.Api.Events.EventPriority :: public const field System.Int32 Low = -100
+SpiralLoader.Api.Events.EventPriority :: public const field System.Int32 Lowest = -200
+SpiralLoader.Api.Events.EventPriority :: public const field System.Int32 Monitor = -2147483648
+SpiralLoader.Api.Events.EventPriority :: public const field System.Int32 Normal = 0
+SpiralLoader.Api.Events.EventPriority :: type public static class
+SpiralLoader.Api.Events.IEventBus :: public abstract method System.Boolean HasSubscribers<TEvent>()
+SpiralLoader.Api.Events.IEventBus :: public abstract method System.Void Publish<TEvent>(TEvent event)
+SpiralLoader.Api.Events.IEventBus :: public abstract method System.Void Subscribe<TEvent>(System.Action<TEvent> handler, System.Int32 priority = 0)
+SpiralLoader.Api.Events.IEventBus :: type public interface
+SpiralLoader.Api.Events.ModsLoadedEvent :: public ctor(System.Collections.Generic.IReadOnlyList<System.String> loadOrder)
+SpiralLoader.Api.Events.ModsLoadedEvent :: public property System.Collections.Generic.IReadOnlyList<System.String> LoadOrder { get; }
+SpiralLoader.Api.Events.ModsLoadedEvent :: type public sealed class
+SpiralLoader.Api.Events.NullEventBus :: public method System.Boolean HasSubscribers<TEvent>()
+SpiralLoader.Api.Events.NullEventBus :: public method System.Void Publish<TEvent>(TEvent event)
+SpiralLoader.Api.Events.NullEventBus :: public method System.Void Subscribe<TEvent>(System.Action<TEvent> handler, System.Int32 priority = 0)
+SpiralLoader.Api.Events.NullEventBus :: public static property SpiralLoader.Api.Events.NullEventBus Instance { get; }
+SpiralLoader.Api.Events.NullEventBus :: type public sealed class : SpiralLoader.Api.Events.IEventBus
+SpiralLoader.Api.Events.RegistrationClosedException :: public ctor(System.String message)
+SpiralLoader.Api.Events.RegistrationClosedException :: type public sealed class : System.InvalidOperationException, System.Runtime.Serialization.ISerializable
+SpiralLoader.Api.Events.ServerResourcesLoadedEvent :: public ctor(System.String hostName)
+SpiralLoader.Api.Events.ServerResourcesLoadedEvent :: public property System.String HostName { get; }
+SpiralLoader.Api.Events.ServerResourcesLoadedEvent :: type public sealed class
+SpiralLoader.Api.Events.ServerStartedEvent :: public ctor(System.String hostName)
+SpiralLoader.Api.Events.ServerStartedEvent :: public property System.String HostName { get; }
+SpiralLoader.Api.Events.ServerStartedEvent :: type public sealed class
+SpiralLoader.Api.Events.ServerStartingEvent :: public ctor(System.String hostName)
+SpiralLoader.Api.Events.ServerStartingEvent :: public property System.String HostName { get; }
+SpiralLoader.Api.Events.ServerStartingEvent :: type public sealed class
+SpiralLoader.Api.Events.ServerStoppingEvent :: public ctor(System.String hostName)
+SpiralLoader.Api.Events.ServerStoppingEvent :: public property System.String HostName { get; }
+SpiralLoader.Api.Events.ServerStoppingEvent :: type public sealed class
+SpiralLoader.Api.IModContext :: public abstract property SpiralLoader.Api.Events.IEventBus Events { get; }
+SpiralLoader.Api.IModContext :: public abstract property SpiralLoader.Api.IModEnvironment Environment { get; }
+SpiralLoader.Api.IModContext :: public abstract property SpiralLoader.Api.IModQuery Mods { get; }
+SpiralLoader.Api.IModContext :: public abstract property SpiralLoader.Api.Logging.IModLogger Logger { get; }
+SpiralLoader.Api.IModContext :: public abstract property SpiralLoader.Api.Manifest.ModManifest Manifest { get; }
+SpiralLoader.Api.IModContext :: public abstract property SpiralLoader.Api.Registries.IRegistryProvider Registries { get; }
+SpiralLoader.Api.IModContext :: type public interface
+SpiralLoader.Api.IModEnvironment :: public abstract property System.String ConfigDirectory { get; }
+SpiralLoader.Api.IModEnvironment :: public abstract property System.String DataDirectory { get; }
+SpiralLoader.Api.IModEnvironment :: public abstract property System.String EntrypointKind { get; }
+SpiralLoader.Api.IModEnvironment :: public abstract property System.String HostName { get; }
+SpiralLoader.Api.IModEnvironment :: public abstract property System.String ModDirectory { get; }
+SpiralLoader.Api.IModEnvironment :: public abstract property System.String Profile { get; }
+SpiralLoader.Api.IModEnvironment :: type public interface
+SpiralLoader.Api.IModQuery :: public abstract method SpiralLoader.Api.Manifest.ModManifest? GetManifest(System.String modId)
+SpiralLoader.Api.IModQuery :: public abstract method System.Boolean IsLoaded(System.String modId)
+SpiralLoader.Api.IModQuery :: public abstract property System.Collections.Generic.IReadOnlyList<System.String> LoadOrder { get; }
+SpiralLoader.Api.IModQuery :: type public interface
+SpiralLoader.Api.ISpiralMod :: public abstract method System.Void Initialize(SpiralLoader.Api.IModContext context)
+SpiralLoader.Api.ISpiralMod :: public default method System.Void Shutdown()
+SpiralLoader.Api.ISpiralMod :: type public interface
+SpiralLoader.Api.Logging.IModLogger :: public abstract method System.Boolean IsEnabled(SpiralLoader.Api.Logging.ModLogLevel level)
+SpiralLoader.Api.Logging.IModLogger :: public abstract method System.Void Log(SpiralLoader.Api.Logging.ModLogLevel level, System.String message, System.Exception? exception = null)
+SpiralLoader.Api.Logging.IModLogger :: public abstract property System.String Source { get; }
+SpiralLoader.Api.Logging.IModLogger :: type public interface
+SpiralLoader.Api.Logging.ModLogLevel :: enum-member Debug = 1
+SpiralLoader.Api.Logging.ModLogLevel :: enum-member Error = 4
+SpiralLoader.Api.Logging.ModLogLevel :: enum-member Fatal = 5
+SpiralLoader.Api.Logging.ModLogLevel :: enum-member Information = 2
+SpiralLoader.Api.Logging.ModLogLevel :: enum-member Trace = 0
+SpiralLoader.Api.Logging.ModLogLevel :: enum-member Warning = 3
+SpiralLoader.Api.Logging.ModLogLevel :: type public enum : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable, System.Int32
+SpiralLoader.Api.Logging.ModLoggerExtensions :: public static method System.Void Debug(SpiralLoader.Api.Logging.IModLogger logger, System.String message)
+SpiralLoader.Api.Logging.ModLoggerExtensions :: public static method System.Void Error(SpiralLoader.Api.Logging.IModLogger logger, System.String message, System.Exception? exception = null)
+SpiralLoader.Api.Logging.ModLoggerExtensions :: public static method System.Void Info(SpiralLoader.Api.Logging.IModLogger logger, System.String message)
+SpiralLoader.Api.Logging.ModLoggerExtensions :: public static method System.Void Trace(SpiralLoader.Api.Logging.IModLogger logger, System.String message)
+SpiralLoader.Api.Logging.ModLoggerExtensions :: public static method System.Void Warn(SpiralLoader.Api.Logging.IModLogger logger, System.String message, System.Exception? exception = null)
+SpiralLoader.Api.Logging.ModLoggerExtensions :: type public static class
+SpiralLoader.Api.Manifest.AssetDeclaration :: public ctor(SpiralLoader.Api.Manifest.AssetKind Kind, System.String Source, System.String Target)
+SpiralLoader.Api.Manifest.AssetDeclaration :: public method System.Boolean Equals(SpiralLoader.Api.Manifest.AssetDeclaration? other)
+SpiralLoader.Api.Manifest.AssetDeclaration :: public method System.Void Deconstruct(out SpiralLoader.Api.Manifest.AssetKind Kind, out System.String Source, out System.String Target)
+SpiralLoader.Api.Manifest.AssetDeclaration :: public override method System.Boolean Equals(System.Object? obj)
+SpiralLoader.Api.Manifest.AssetDeclaration :: public override method System.Int32 GetHashCode()
+SpiralLoader.Api.Manifest.AssetDeclaration :: public override method System.String ToString()
+SpiralLoader.Api.Manifest.AssetDeclaration :: public property SpiralLoader.Api.Manifest.AssetKind Kind { get; init; }
+SpiralLoader.Api.Manifest.AssetDeclaration :: public property System.String Source { get; init; }
+SpiralLoader.Api.Manifest.AssetDeclaration :: public property System.String Target { get; init; }
+SpiralLoader.Api.Manifest.AssetDeclaration :: type public sealed class : System.IEquatable<SpiralLoader.Api.Manifest.AssetDeclaration>
+SpiralLoader.Api.Manifest.AssetKind :: enum-member SpiralDb = 1
+SpiralLoader.Api.Manifest.AssetKind :: enum-member Wad = 0
+SpiralLoader.Api.Manifest.AssetKind :: type public enum : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable, System.Int32
+SpiralLoader.Api.Manifest.ModCompatibility :: public ctor()
+SpiralLoader.Api.Manifest.ModCompatibility :: public property System.Collections.Generic.IReadOnlyList<System.String> ClientRevisions { get; init; }
+SpiralLoader.Api.Manifest.ModCompatibility :: public property System.Collections.Generic.IReadOnlyList<System.String> ImlightCommits { get; init; }
+SpiralLoader.Api.Manifest.ModCompatibility :: type public sealed class
+SpiralLoader.Api.Manifest.ModDependency :: public ctor(System.String ModId, SpiralLoader.Api.Versioning.VersionRange Range)
+SpiralLoader.Api.Manifest.ModDependency :: public method System.Boolean Equals(SpiralLoader.Api.Manifest.ModDependency? other)
+SpiralLoader.Api.Manifest.ModDependency :: public method System.Void Deconstruct(out System.String ModId, out SpiralLoader.Api.Versioning.VersionRange Range)
+SpiralLoader.Api.Manifest.ModDependency :: public override method System.Boolean Equals(System.Object? obj)
+SpiralLoader.Api.Manifest.ModDependency :: public override method System.Int32 GetHashCode()
+SpiralLoader.Api.Manifest.ModDependency :: public override method System.String ToString()
+SpiralLoader.Api.Manifest.ModDependency :: public property SpiralLoader.Api.Versioning.VersionRange Range { get; init; }
+SpiralLoader.Api.Manifest.ModDependency :: public property System.String ModId { get; init; }
+SpiralLoader.Api.Manifest.ModDependency :: type public sealed class : System.IEquatable<SpiralLoader.Api.Manifest.ModDependency>
+SpiralLoader.Api.Manifest.ModManifest :: public ctor()
+SpiralLoader.Api.Manifest.ModManifest :: public method System.Collections.Generic.IReadOnlyList<System.String> GetEntrypoints(System.String kind)
+SpiralLoader.Api.Manifest.ModManifest :: public override method System.String ToString()
+SpiralLoader.Api.Manifest.ModManifest :: public property SpiralLoader.Api.Manifest.ModCompatibility Compatibility { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Collections.Generic.IReadOnlyList<System.String>> Entrypoints { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyList<SpiralLoader.Api.Manifest.AssetDeclaration> Assets { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyList<SpiralLoader.Api.Manifest.ModDependency> Breaks { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyList<SpiralLoader.Api.Manifest.ModDependency> Depends { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyList<SpiralLoader.Api.Manifest.ModDependency> Recommends { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyList<System.String> Assemblies { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyList<System.String> Authors { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyList<System.String> LoadAfter { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.Collections.Generic.IReadOnlyList<System.String> LoadBefore { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.String Description { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public property System.String? License { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public required property SpiralLoader.Api.Versioning.SemanticVersion Version { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public required property System.Int32 SchemaVersion { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public required property System.String Id { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: public required property System.String Name { get; init; }
+SpiralLoader.Api.Manifest.ModManifest :: type public sealed class
+SpiralLoader.Api.Registries.EmptyRegistryProvider :: public method SpiralLoader.Api.Registries.IRegistry<T> Get<T>(SpiralLoader.Api.Registries.RegistryKey<T> key)
+SpiralLoader.Api.Registries.EmptyRegistryProvider :: public method System.Boolean TryGet<T>(SpiralLoader.Api.Registries.RegistryKey<T> key, out SpiralLoader.Api.Registries.IRegistry<T> registry)
+SpiralLoader.Api.Registries.EmptyRegistryProvider :: public static property SpiralLoader.Api.Registries.EmptyRegistryProvider Instance { get; }
+SpiralLoader.Api.Registries.EmptyRegistryProvider :: type public sealed class : SpiralLoader.Api.Registries.IRegistryProvider
+SpiralLoader.Api.Registries.IRegistry<T> :: public abstract method SpiralLoader.Api.Registries.RegistryEntry<T> Register(System.String name, T value)
+SpiralLoader.Api.Registries.IRegistry<T> :: public abstract property SpiralLoader.Api.Registries.RegistryKey<T> Key { get; }
+SpiralLoader.Api.Registries.IRegistry<T> :: public abstract property System.Collections.Generic.IReadOnlyList<SpiralLoader.Api.Registries.RegistryEntry<T>> Entries { get; }
+SpiralLoader.Api.Registries.IRegistry<T> :: type public interface
+SpiralLoader.Api.Registries.IRegistryProvider :: public abstract method SpiralLoader.Api.Registries.IRegistry<T> Get<T>(SpiralLoader.Api.Registries.RegistryKey<T> key)
+SpiralLoader.Api.Registries.IRegistryProvider :: public abstract method System.Boolean TryGet<T>(SpiralLoader.Api.Registries.RegistryKey<T> key, out SpiralLoader.Api.Registries.IRegistry<T> registry)
+SpiralLoader.Api.Registries.IRegistryProvider :: type public interface
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public ctor(System.String Id, System.String OwnerModId, T Value)
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public method System.Boolean Equals(SpiralLoader.Api.Registries.RegistryEntry<T>? other)
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public method System.Void Deconstruct(out System.String Id, out System.String OwnerModId, out T Value)
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public override method System.Boolean Equals(System.Object? obj)
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public override method System.Int32 GetHashCode()
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public override method System.String ToString()
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public property System.String Id { get; init; }
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public property System.String OwnerModId { get; init; }
+SpiralLoader.Api.Registries.RegistryEntry<T> :: public property T Value { get; init; }
+SpiralLoader.Api.Registries.RegistryEntry<T> :: type public sealed class : System.IEquatable<SpiralLoader.Api.Registries.RegistryEntry<T>>
+SpiralLoader.Api.Registries.RegistryKey<T> :: public ctor(System.String name)
+SpiralLoader.Api.Registries.RegistryKey<T> :: public method System.Boolean Equals(SpiralLoader.Api.Registries.RegistryKey<T>? other)
+SpiralLoader.Api.Registries.RegistryKey<T> :: public override method System.Boolean Equals(System.Object? obj)
+SpiralLoader.Api.Registries.RegistryKey<T> :: public override method System.Int32 GetHashCode()
+SpiralLoader.Api.Registries.RegistryKey<T> :: public override method System.String ToString()
+SpiralLoader.Api.Registries.RegistryKey<T> :: public property System.String Name { get; }
+SpiralLoader.Api.Registries.RegistryKey<T> :: type public sealed class : System.IEquatable<SpiralLoader.Api.Registries.RegistryKey<T>>
+SpiralLoader.Api.Registries.RegistryNames :: public static method System.Boolean IsValidPath(System.String? name)
+SpiralLoader.Api.Registries.RegistryNames :: public static method System.Boolean IsValidQualifiedName(System.String? name)
+SpiralLoader.Api.Registries.RegistryNames :: type public static class
+SpiralLoader.Api.SpiralLoaderInfo :: public const field System.Int32 ManifestSchemaVersion = 1
+SpiralLoader.Api.SpiralLoaderInfo :: public const field System.String LoaderModId = "spiralloader"
+SpiralLoader.Api.SpiralLoaderInfo :: public const field System.String ManifestFileName = "spiralmod.json"
+SpiralLoader.Api.SpiralLoaderInfo :: public const field System.String ServerEntrypoint = "server"
+SpiralLoader.Api.SpiralLoaderInfo :: public static property SpiralLoader.Api.Versioning.SemanticVersion ApiVersion { get; } = "0.1.0"
+SpiralLoader.Api.SpiralLoaderInfo :: type public static class
+SpiralLoader.Api.Versioning.SemanticVersion :: public ctor(System.Int32 major, System.Int32 minor, System.Int32 patch, System.String? prerelease = null, System.String? build = null)
+SpiralLoader.Api.Versioning.SemanticVersion :: public method System.Boolean Equals(SpiralLoader.Api.Versioning.SemanticVersion? other)
+SpiralLoader.Api.Versioning.SemanticVersion :: public method System.Int32 CompareTo(SpiralLoader.Api.Versioning.SemanticVersion? other)
+SpiralLoader.Api.Versioning.SemanticVersion :: public override method System.Boolean Equals(System.Object? obj)
+SpiralLoader.Api.Versioning.SemanticVersion :: public override method System.Int32 GetHashCode()
+SpiralLoader.Api.Versioning.SemanticVersion :: public override method System.String ToString()
+SpiralLoader.Api.Versioning.SemanticVersion :: public property System.Boolean IsPrerelease { get; }
+SpiralLoader.Api.Versioning.SemanticVersion :: public property System.Collections.Generic.IReadOnlyList<System.String> PrereleaseIdentifiers { get; }
+SpiralLoader.Api.Versioning.SemanticVersion :: public property System.Int32 Major { get; }
+SpiralLoader.Api.Versioning.SemanticVersion :: public property System.Int32 Minor { get; }
+SpiralLoader.Api.Versioning.SemanticVersion :: public property System.Int32 Patch { get; }
+SpiralLoader.Api.Versioning.SemanticVersion :: public property System.String? Build { get; }
+SpiralLoader.Api.Versioning.SemanticVersion :: public property System.String? Prerelease { get; }
+SpiralLoader.Api.Versioning.SemanticVersion :: public static method SpiralLoader.Api.Versioning.SemanticVersion Parse(System.String text)
+SpiralLoader.Api.Versioning.SemanticVersion :: public static method System.Boolean TryParse(System.String? text, out SpiralLoader.Api.Versioning.SemanticVersion version)
+SpiralLoader.Api.Versioning.SemanticVersion :: public static method System.Boolean TryParse(System.String? text, out SpiralLoader.Api.Versioning.SemanticVersion version, out System.String error)
+SpiralLoader.Api.Versioning.SemanticVersion :: type public sealed class : System.IComparable<SpiralLoader.Api.Versioning.SemanticVersion>, System.IEquatable<SpiralLoader.Api.Versioning.SemanticVersion>
+SpiralLoader.Api.Versioning.VersionRange :: public method System.Boolean IsSatisfiedBy(SpiralLoader.Api.Versioning.SemanticVersion version)
+SpiralLoader.Api.Versioning.VersionRange :: public override method System.String ToString()
+SpiralLoader.Api.Versioning.VersionRange :: public property System.String Text { get; }
+SpiralLoader.Api.Versioning.VersionRange :: public static method SpiralLoader.Api.Versioning.VersionRange Parse(System.String text)
+SpiralLoader.Api.Versioning.VersionRange :: public static method System.Boolean TryParse(System.String? text, out SpiralLoader.Api.Versioning.VersionRange range)
+SpiralLoader.Api.Versioning.VersionRange :: public static method System.Boolean TryParse(System.String? text, out SpiralLoader.Api.Versioning.VersionRange range, out System.String error)
+SpiralLoader.Api.Versioning.VersionRange :: public static property SpiralLoader.Api.Versioning.VersionRange Any { get; }
+SpiralLoader.Api.Versioning.VersionRange :: type public sealed class

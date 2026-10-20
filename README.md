@@ -13,7 +13,7 @@ SpiralLoader is not affiliated with the upstream server project or any game publ
 - **A small public API.** Lifecycle and gameplay events, commands, namespaced registries, and mod logging are exposed through `SpiralLoader.Api`.
 - **Per-mod loading contexts.** Each mod gets its own .NET `AssemblyLoadContext`; dependencies share types as needed. Failed initialization rolls back that mod's registrations and is reported according to the configured failure policy.
 - **Client-process messages.** With the Imlight 1.2.0 patch series, a separately built mod can claim client-process job IDs, start processes, and receive only the replies belonging to its claims through `ModMessageService`.
-- **A headless development host.** Build and exercise mods without an Imlight server.
+- **A headless development host.** Build and exercise mods without an Imlight server, and run `SpiralLoader.Host --check` for a PASS/FAIL compatibility verdict with diagnostic codes and fixes.
 
 Mods are native .NET code and run inside the server process with its permissions. Load contexts and fault handling help organize mods and contain ordinary failures; **they are not a security sandbox**. Mods load at startup and changes require a server restart.
 
@@ -25,6 +25,8 @@ The code is split into a dependency-free mod API, a host-agnostic runtime, an Im
 
 - [Architecture and runtime behavior](docs/architecture.md)
 - [Mod authoring guide](docs/mod-authoring.md)
+- [Testing your mod's compatibility](docs/compatibility-testing.md) (no game files needed)
+- [API compatibility contracts and SemVer expectations](docs/api-compatibility.md)
 - [Building, testing, and Imlight setup](docs/building.md)
 - [Imlight patch series and verification details](integration/imlight/README.md)
 - [Imlight and modding compatibility research](docs/audit.md)
@@ -49,7 +51,7 @@ dotnet build SpiralLoader.sln -c Release
 dotnet test SpiralLoader.sln -c Release --no-build
 ```
 
-The current suite contains 153 automated tests. The build also places ready-to-load example mod folders under `artifacts/mods/`.
+The current suite contains 172 automated tests. The build also places ready-to-load example mod folders under `artifacts/mods/`.
 
 ## Build and run HelloSpiral
 
@@ -73,6 +75,16 @@ pwsh integration/imlight/verify/Verify-Patch.ps1 -Commit 2a16010e59b95cc449d8e21
 ```
 
 On Linux or macOS, use `integration/imlight/setup-imlight.sh` and `integration/imlight/verify/verify-patch.sh` (set `IMLIGHT_COMMIT` to verify the QA revision). The patch series has 13 commits and is tested on both supported revisions. The harness uses stubs for generated Imcodec and selected Imlight types; the Windows milestone testing additionally built both complete patched Imlight revisions using real locally available generator inputs and exercised the bridge against the resulting assemblies.
+
+## Build your own mod
+
+`examples/standalone-mod` is a complete mod project that builds outside this repository with the plain `dotnet` CLI; [the mod authoring guide](docs/mod-authoring.md) walks through referencing `SpiralLoader.Api`, writing `spiralmod.json`, declaring the minimum Imlight integration API (`"imlight": "^1.2.0"`), and loading the result. Check any mod without game files:
+
+```powershell
+dotnet run --project src/SpiralLoader.Host -c Release -- --check --mod path\to\my-mod --imlight-api 1.2.0
+```
+
+SpiralLoader mods are server-side. Delivering new client scripts, GUI or archives is not implemented; see [the authoring guide](docs/mod-authoring.md#what-a-mod-can-do-today-server-side-versus-client-assets).
 
 ## Verification status
 

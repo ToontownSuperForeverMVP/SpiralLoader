@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Source of the PREBUILT compatibility fixture tests/SpiralLoader.Tests/Prebuilt/api-0.1.0/api-tour.
+    It is deliberately not part of SpiralLoader.sln: the test suite loads the committed binary, built against
+    SpiralLoader.Api 0.1.0.0, to prove mods compiled earlier keep loading and running without a rebuild.
+    Rebuild only when you intend to refresh the fixture (see tests/fixtures/README.md).
+  -->
+  <Import Project="..\..\..\build\SpiralLoader.Mod.props" />
+  <PropertyGroup>
+    <SpiralModId>api-tour</SpiralModId>
+    <AssemblyName>ApiTour</AssemblyName>
+    <RootNamespace>ApiTour</RootNamespace>
+    <SpiralModOutputRoot>$(MSBuildThisFileDirectory)..\..\SpiralLoader.Tests\Prebuilt\api-0.1.0\</SpiralModOutputRoot>
+    <!-- Keep the committed binary byte-stable: no debug symbols, no source paths. -->
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <PathMap>$(MSBuildThisFileDirectory)=/src/ApiTourMod/</PathMap>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\SpiralLoader.Api\SpiralLoader.Api.csproj" Private="false" />
+  </ItemGroup>
+  <Import Project="..\..\..\build\SpiralLoader.Mod.targets" />
+</Project>

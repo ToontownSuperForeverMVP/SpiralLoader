@@ -14,7 +14,11 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 if (-not $ImlightDirectory) { $ImlightDirectory = Join-Path $repoRoot "external\Imlight-verify-$($Commit.Substring(0, 12))" }
 $verifyMods = @('VerifyMod', 'ClientProcessMod', 'IsolationMod', 'DuplicateClaimMod')
-$clientProcessMods = 'client-process-verify, isolation-verify, duplicate-claim-verify'
+# Disabled for the vanilla run: the client-process mods, and the data mod that needs a newer integration API than the
+# Director provides (under the Abort policy a rejected mod would stop startup; disabling it must not).
+$clientProcessMods = 'client-process-verify, isolation-verify, duplicate-claim-verify, future-api-verify'
+# The newest recorded baseline of the public Imlight.CoreLib.Modding surface.
+$apiBaseline = Join-Path (Get-ChildItem (Join-Path $repoRoot 'api-baseline') -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1).FullName 'Imlight.CoreLib.Modding.txt'
 
 & (Join-Path $repoRoot 'integration\imlight\Setup-Imlight.ps1') -Destination $ImlightDirectory -Commit $Commit -NoSubmodules
 
@@ -34,6 +38,7 @@ function Invoke-Director([string]$Policy, [string]$Disabled) {
     $mods = New-Item -ItemType Directory -Force (Join-Path $runDirectory 'mods')
     Copy-Item -Recurse (Join-Path $repoRoot 'artifacts\mods\hello-spiral') $mods
     Get-ChildItem (Join-Path $PSScriptRoot 'bin\mods') -Directory | ForEach-Object { Copy-Item -Recurse $_.FullName $mods }
+    Get-ChildItem (Join-Path $PSScriptRoot 'DataMods') -Directory | ForEach-Object { Copy-Item -Recurse $_.FullName $mods }
     $text = $originalIni -replace '(?m)^FailurePolicy = .*$', "FailurePolicy = $Policy" `
                          -replace '(?m)^DisabledMods =.*$', "DisabledMods = $Disabled"
     [IO.File]::WriteAllText($ini, $text)
@@ -80,7 +85,7 @@ $failed = $false
 $modded = Invoke-Director 'Continue' ''
 Write-Host "Checking patched Director with mods ($Commit):"
 $revisionExpectations = Join-Path $PSScriptRoot "expected-output-$($Commit.Substring(0, 12)).txt"
-if (-not (Test-Output $modded @((Join-Path $PSScriptRoot 'expected-output.txt'), $revisionExpectations))) { $failed = $true }
+if (-not (Test-Output $modded @((Join-Path $PSScriptRoot 'expected-output.txt'), $revisionExpectations, $apiBaseline))) { $failed = $true }
 if (Test-Path (Join-Path $runDirectory 'moddata\default\hello-spiral\started.txt')) {
     Write-Host '  ok   hello-spiral wrote moddata/default/hello-spiral/started.txt'
 } else {

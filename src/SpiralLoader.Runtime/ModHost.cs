@@ -7,6 +7,7 @@ using SpiralLoader.Api.Registries;
 using SpiralLoader.Api.Versioning;
 using SpiralLoader.Runtime.Assets;
 using SpiralLoader.Runtime.Events;
+using SpiralLoader.Runtime.Loading;
 using SpiralLoader.Runtime.Logging;
 using SpiralLoader.Runtime.Manifest;
 using SpiralLoader.Runtime.Registries;
@@ -168,7 +169,7 @@ public sealed class ModHost : IModQuery {
         var records = new List<ModRecord>();
         foreach (var root in _options.ModDirectories.Select(Path.GetFullPath).Distinct(StringComparer.Ordinal)) {
             if (!Directory.Exists(root)) {
-                _hostDiagnostics.Add(new ModDiagnostic(DiagnosticSeverity.Info, "host.mods_directory_missing",
+                _hostDiagnostics.Add(new ModDiagnostic(DiagnosticSeverity.Info, DiagnosticCodes.HostModsDirectoryMissing,
                     $"Mods directory {root} does not exist; no mods loaded from it."));
                 continue;
             }
@@ -185,6 +186,14 @@ public sealed class ModHost : IModQuery {
                     continue;
                 }
                 records.Add(new ModRecord(directory, manifestPath));
+            }
+        }
+        foreach (var directory in _options.ModFolders.Select(Path.GetFullPath).Distinct(StringComparer.Ordinal)) {
+            if (File.Exists(Path.Combine(directory, SpiralLoaderInfo.ManifestFileName))) {
+                records.Add(new ModRecord(directory, Path.Combine(directory, SpiralLoaderInfo.ManifestFileName)));
+            } else {
+                _hostDiagnostics.Add(new ModDiagnostic(DiagnosticSeverity.Error, DiagnosticCodes.ManifestUnreadable,
+                    $"Mod folder {directory} does not contain {SpiralLoaderInfo.ManifestFileName}."));
             }
         }
         _logger.Debug($"Discovered {records.Count} mod director{(records.Count == 1 ? "y" : "ies")}.");
@@ -281,7 +290,9 @@ public sealed class ModHost : IModQuery {
             .Select(d => byId.GetValueOrDefault(d.ModId))
             .FirstOrDefault(d => d is not null && d.State != ModState.Initialized);
         if (failedDependency is not null) {
-            record.Fail(DiagnosticCodes.DependencyFailed, $"Required dependency '{failedDependency.Id}' did not initialize ({failedDependency.State}).");
+            var reasons = string.Join(", ", failedDependency.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Code).Distinct());
+            record.Fail(DiagnosticCodes.DependencyFailed,
+                $"Required dependency '{failedDependency.Id}' did not initialize ({failedDependency.State}{(reasons.Length > 0 ? ": " + reasons : string.Empty)}); see its entry in this report.");
             return;
         }
 
@@ -320,9 +331,10 @@ public sealed class ModHost : IModQuery {
             try {
                 entrypoint.Initialize(modContext);
             } catch (Exception ex) {
-                record.Fail(DiagnosticCodes.InitializationFailed, $"{entrypoint.GetType().FullName}.Initialize threw {ex.GetType().Name}: {ex.Message}");
                 _logger.Error($"Mod '{record.Id}' failed during initialization.", ex);
-                RollBack(record);
+                var (subscriptions, registrations) = RollBack(record);
+                record.Fail(DiagnosticCodes.InitializationFailed,
+                    $"{entrypoint.GetType().FullName}.Initialize threw {Describe(ex)}. Rolled back {subscriptions} subscription(s) and {registrations} registration(s).");
                 return;
             }
         }
@@ -335,6 +347,9 @@ public sealed class ModHost : IModQuery {
         var loaded = new List<Assembly>();
         foreach (var relative in record.Manifest!.Assemblies) {
             var path = Path.Combine(record.Directory, relative);
+            if (!CheckApiReference(record, relative, path)) {
+                return false;
+            }
             try {
                 var assembly = context.LoadDeclared(path);
                 // Force every type to resolve now, so a missing reference fails this mod with a clear message
@@ -354,11 +369,31 @@ public sealed class ModHost : IModQuery {
         return true;
     }
 
+    // The API assembly's AssemblyVersion changes only for breaking API changes, so a different version in the
+    // mod's metadata is the one reliable binary-compatibility signal available before running its code.
+    private static bool CheckApiReference(ModRecord record, string relative, string path) {
+        var referenced = ApiReferenceCheck.ReadReferencedVersion(path, typeof(ISpiralMod).Assembly.GetName().Name!);
+        var provided = typeof(ISpiralMod).Assembly.GetName().Version;
+        if (referenced is null || provided is null || referenced == provided) {
+            return true;
+        }
+
+        if (referenced > provided) {
+            record.Fail(DiagnosticCodes.AssemblyApiNewer,
+                $"'{relative}' was built against SpiralLoader.Api {referenced}, but this host provides {provided}.");
+            return false;
+        }
+        record.Warn(DiagnosticCodes.AssemblyApiOlder,
+            $"'{relative}' was built against SpiralLoader.Api {referenced}; this host provides {provided}, whose breaking changes may affect it.");
+        return true;
+    }
+
     private bool TryCreateEntrypoints(ModRecord record) {
         foreach (var typeName in record.Manifest!.GetEntrypoints(_options.EntrypointKind)) {
             var type = record.Assemblies.Select(a => a.GetType(typeName, throwOnError: false)).FirstOrDefault(t => t is not null);
             if (type is null) {
-                record.Fail(DiagnosticCodes.EntrypointNotFound, $"Entrypoint type '{typeName}' was not found in the mod's assemblies.");
+                record.Fail(DiagnosticCodes.EntrypointNotFound,
+                    $"Entrypoint type '{typeName}' was not found in the mod's assemblies ({string.Join(", ", record.Manifest.Assemblies)}). {DescribeCandidates(record)}");
                 return false;
             }
 
@@ -371,11 +406,24 @@ public sealed class ModHost : IModQuery {
             try {
                 record.Entrypoints.Add((ISpiralMod)Activator.CreateInstance(type)!);
             } catch (TargetInvocationException ex) when (ex.InnerException is not null) {
-                record.Fail(DiagnosticCodes.InitializationFailed, $"Constructor of '{typeName}' threw {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                record.Fail(DiagnosticCodes.InitializationFailed, $"Constructor of '{typeName}' threw {Describe(ex.InnerException)}.");
                 return false;
             }
         }
         return true;
+    }
+
+    // Names the real ISpiralMod implementations so a typo or a missing namespace is obvious from the report.
+    private static string DescribeCandidates(ModRecord record) {
+        var candidates = record.Assemblies
+            .SelectMany(a => a.GetTypes())
+            .Where(t => t.IsClass && !t.IsAbstract && typeof(ISpiralMod).IsAssignableFrom(t))
+            .Select(t => t.FullName ?? t.Name)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        return candidates.Count > 0
+            ? $"Types that implement ISpiralMod there: {string.Join(", ", candidates)}."
+            : "None of its types implement ISpiralMod.";
     }
 
     private static string? DescribeInvalidEntrypoint(Type type) {
@@ -394,12 +442,21 @@ public sealed class ModHost : IModQuery {
         return null;
     }
 
-    private void RollBack(ModRecord record) {
+    private (int Subscriptions, int Registrations) RollBack(ModRecord record) {
         var subscriptions = _bus.RemoveOwner(record.Id);
         var registrations = _registries.RemoveOwner(record.Id);
         if (subscriptions + registrations > 0) {
             _logger.Warn($"Rolled back {subscriptions} subscription(s) and {registrations} registration(s) made by '{record.Id}'.");
         }
+        return (subscriptions, registrations);
+    }
+
+    // "ArgumentException: message", plus the root cause when the exception wraps another one.
+    private static string Describe(Exception ex) {
+        var root = ex.GetBaseException();
+        return ReferenceEquals(root, ex)
+            ? $"{ex.GetType().Name}: {ex.Message}"
+            : $"{ex.GetType().Name}: {ex.Message} (caused by {root.GetType().Name}: {root.Message})";
     }
 
     private void ShutdownMods() {

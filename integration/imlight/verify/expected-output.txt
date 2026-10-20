@@ -1,5 +1,5 @@
 SpiralLoader 0.1.0 starting (host: Imlight
-5 mod(s) found, 4 initialized, 1 failed.
+6 mod(s) found, 4 initialized, 2 failed.
 init.failed: DuplicateClaimVerifyMod.DuplicateClaimMod.Initialize threw ArgumentException: imlight:client_process_jobs rejected 'duplicate-claim-verify:stolen_menu': the value 770101 is already held by 'client-process-verify:menu'.
 [hello-spiral] Hello from Hello Spiral 1.0.0 on Imlight.
 VERIFY: event ServerStarting Imlight
@@ -42,3 +42,6 @@ VERIFY: scenarios done
 !VERIFY: isolation-verify started a process under a foreign job id
 !VERIFY: scenario FAILED
 !threw unknown exception
+dependency.version_mismatch: Requires 'imlight' ^1.3.0, but 1.2.0 is present (provided by the host).
+future-api-verify 1.0.0 [Rejected: dependency.version_mismatch]
+VERIFY: imlight-api members=35

@@ -54,6 +54,7 @@ namespace Imlight.CoreLib.Login {
             try {
                 var gameFactory = system.ActorOf(GameServiceFactory.Props(), "scenarioGameServiceFactory");
 
+                PrintModdingApiSurface();
                 // The bridge exists because MessageService is internal: a mod can only see ModMessageService.
                 Console.WriteLine($"VERIFY: scenario visibility MessageService.public={typeof(MessageService).IsPublic} " +
                                   $"ModMessageService.public={typeof(ModMessageService).IsPublic}");
@@ -69,6 +70,19 @@ namespace Imlight.CoreLib.Login {
             } catch (Exception ex) {
                 Console.WriteLine($"VERIFY: scenario FAILED {ex}");
             }
+        }
+
+        // The public surface mods compile against (the integration API), printed one line per member so the verify
+        // scripts can compare it with api-baseline/<version>/Imlight.CoreLib.Modding.txt. Same describer as the
+        // SpiralLoader.Api baseline test; see docs/api-compatibility.md.
+        private static void PrintModdingApiSurface() {
+            var surface = SpiralLoader.Tooling.PublicApiSurface.Describe(typeof(ImlightModding).Assembly.GetExportedTypes()
+                .Where(type => type.Namespace == "Imlight.CoreLib.Modding"));
+            Console.WriteLine($"surface Imlight.CoreLib.Modding integration API {ImlightModding.IntegrationApiVersion}");
+            foreach (var line in surface) {
+                Console.WriteLine(line);
+            }
+            Console.WriteLine($"VERIFY: imlight-api members={surface.Count}");
         }
 
         private static void Claims()

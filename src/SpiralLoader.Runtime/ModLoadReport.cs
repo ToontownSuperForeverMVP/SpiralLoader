@@ -21,7 +21,11 @@ public sealed class ModLoadReport {
 
     public IEnumerable<ModRecord> Failures => Mods.Where(m => m.HasFailed);
 
-    public bool HasFailures => Mods.Any(m => m.HasFailed);
+    /// <summary>True if any mod was rejected or failed, or the host itself reported an error (for example a requested mod folder without a manifest).</summary>
+    public bool HasFailures => Mods.Any(m => m.HasFailed) || HostErrors.Any();
+
+    /// <summary>Error-level <see cref="HostDiagnostics"/>.</summary>
+    public IEnumerable<ModDiagnostic> HostErrors => HostDiagnostics.Where(d => d.Severity == DiagnosticSeverity.Error);
 
     public ModRecord? Find(string id) => Mods.FirstOrDefault(m => m.Id == id);
 
@@ -30,18 +34,35 @@ public sealed class ModLoadReport {
         var builder = new StringBuilder();
         var initialized = Mods.Count(m => m.State == ModState.Initialized);
         builder.AppendLine($"SpiralLoader: {Mods.Count} mod(s) found, {initialized} initialized, {Failures.Count()} failed.");
+        if (HasFailures) {
+            builder.AppendLine("  Needs attention: " + string.Join("; ", Failures.Select(Summarize).Concat(HostErrors.Select(e => $"host [{e.Code}]"))));
+        }
         foreach (var diagnostic in HostDiagnostics) {
-            builder.AppendLine($"  {diagnostic}");
+            AppendDiagnostic(builder, "  ", diagnostic);
         }
         foreach (var mod in Mods) {
             var version = mod.Manifest?.Version.ToString() ?? "?";
             var index = mod.LoadIndex >= 0 ? $"#{mod.LoadIndex + 1}" : "--";
             builder.AppendLine($"  {index,-4} {mod.Id} {version} [{mod.State}] ({mod.Directory})");
             foreach (var diagnostic in mod.Diagnostics) {
-                builder.AppendLine($"         {diagnostic}");
+                AppendDiagnostic(builder, "         ", diagnostic);
             }
         }
         return builder.ToString().TrimEnd();
+    }
+
+    // "bad-mod 1.0.0 [Failed: init.failed]" - which mod, in what state, and the code to look up.
+    private static string Summarize(ModRecord mod) {
+        var codes = mod.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Code).Distinct();
+        var version = mod.Manifest?.Version.ToString();
+        return $"{mod.Id}{(version is null ? string.Empty : " " + version)} [{mod.State}: {string.Join(", ", codes)}]";
+    }
+
+    private static void AppendDiagnostic(StringBuilder builder, string indent, ModDiagnostic diagnostic) {
+        builder.AppendLine($"{indent}{diagnostic}");
+        if (diagnostic.Severity != DiagnosticSeverity.Info && diagnostic.Hint is { } hint) {
+            builder.AppendLine($"{indent}     fix: {hint}");
+        }
     }
 
 }

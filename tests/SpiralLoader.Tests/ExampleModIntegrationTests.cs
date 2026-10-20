@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using SpiralLoader.Api.Commands;
 using SpiralLoader.Api.Events;
 using SpiralLoader.Runtime;
@@ -66,24 +65,7 @@ public sealed class ExampleModIntegrationTests {
         Assert.Contains(DiagnosticCodes.DependencyRejected, result.Output);
     }
 
-    private static async Task<(int ExitCode, string Output)> RunHost(string workingDirectory, params string[] arguments) {
-        var dotnet = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
-        var start = new ProcessStartInfo(dotnet) {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        start.ArgumentList.Add(BuildPaths.HeadlessHostPath);
-        foreach (var argument in arguments) {
-            start.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(start)!;
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        await process.WaitForExitAsync(timeout.Token);
-        return (process.ExitCode, await stdout + await stderr);
-    }
+    private static Task<(int ExitCode, string Output)> RunHost(string workingDirectory, params string[] arguments)
+        => ProcessRunner.RunHostAsync(workingDirectory, arguments);
 
 }

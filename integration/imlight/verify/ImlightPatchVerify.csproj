@@ -32,6 +32,8 @@
     <Compile Include="Stubs.cs" />
     <Compile Include="ImcodecStubs.cs" />
     <Compile Include="Scenarios.cs" />
+    <!-- The reflection describer shared with the test project and the SpiralLoader.ApiSurface tool. -->
+    <Compile Include="$(SpiralLoaderRepoRoot)tools/SpiralLoader.ApiSurface/PublicApiSurface.cs" />
     <Compile Include="$(_Imlight)Imlight.Director/Program.cs" />
     <Compile Include="$(_Imlight)Imlight.Director/AkkaConfiguration.cs" />
     <Compile Include="$(_Imlight)Imlight.Director/ResourceContainer.cs" />

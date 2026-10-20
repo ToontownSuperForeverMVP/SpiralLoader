@@ -15,7 +15,7 @@ The series applies and its automated harness passes against the pinned Imlight c
 
 ## Official roadmap
 
-1. Stabilize extension APIs, document compatibility contracts, and improve mod compatibility checks.
+1. Stabilize extension APIs, document compatibility contracts, and improve mod compatibility checks. *(Started: [API compatibility contracts](api-compatibility.md), recorded baselines, the `SpiralLoader.Host --check` developer workflow and [compatibility test catalogue](compatibility-testing.md). The API is still experimental and not declared stable.)*
 2. Add zone entity template resolution and NPC statistic hooks.
 3. Add combat, spell, and gameplay extension events.
 4. Add zone component registration and teleportation hooks.
@@ -29,4 +29,4 @@ These are project directions, not claims that the features already exist. Spiral
 
 ## Verification boundaries
 
-The server-side loader and `ModMessageService` bridge passed real Windows integration tests against the two supported Imlight revisions. The full automated suite contains 153 tests. A complete client gameplay session has not been verified, and client WAD or SpiralDB overlays are not implemented. Keep those limits explicit in release notes and compatibility claims.
+The server-side loader and `ModMessageService` bridge passed real Windows integration tests against the two supported Imlight revisions. The full automated suite contains 172 tests. A complete client gameplay session has not been verified, and client WAD or SpiralDB overlays are not implemented. Keep those limits explicit in release notes and compatibility claims.

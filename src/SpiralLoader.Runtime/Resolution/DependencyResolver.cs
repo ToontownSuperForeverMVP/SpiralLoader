@@ -82,11 +82,15 @@ internal static class DependencyResolver {
             }
             if (version is null) {
                 return (DiagnosticCodes.DependencyMissing,
-                    $"Requires '{dependency.ModId}' ({dependency.Range}), which is not installed.");
+                    $"Requires '{dependency.ModId}' ({dependency.Range}), which is not installed. "
+                    + $"The host provides these built-ins: {string.Join(", ", builtIns.Values.OrderBy(b => b.Id, StringComparer.Ordinal).Select(b => $"{b.Id} {b.Version}"))}.");
             }
             if (!dependency.Range.IsSatisfiedBy(version)) {
+                var source = active.TryGetValue(dependency.ModId, out var installed)
+                    ? $"installed at {installed.Directory}"
+                    : "provided by the host";
                 return (DiagnosticCodes.DependencyVersionMismatch,
-                    $"Requires '{dependency.ModId}' {dependency.Range}, but {version} is present.");
+                    $"Requires '{dependency.ModId}' {dependency.Range}, but {version} is present ({source}).");
             }
         }
         return null;

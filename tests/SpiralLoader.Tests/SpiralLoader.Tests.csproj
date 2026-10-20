@@ -34,9 +34,18 @@
       <_Parameter2>$(SpiralLoaderRepoRoot)artifacts/mods</_Parameter2>
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RepoRoot</_Parameter1>
+      <_Parameter2>$(SpiralLoaderRepoRoot)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
       <_Parameter1>HeadlessHostPath</_Parameter1>
       <_Parameter2>$(SpiralLoaderRepoRoot)src/SpiralLoader.Host/bin/$(Configuration)/net10.0/SpiralLoader.Host.dll</_Parameter2>
     </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The same reflection code the SpiralLoader.ApiSurface tool uses, so tests and tool describe an API identically. -->
+    <Compile Include="..\..\tools\SpiralLoader.ApiSurface\PublicApiSurface.cs" Link="Infrastructure\PublicApiSurface.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "future-api-verify",
+  "version": "1.0.0",
+  "name": "Future API verification mod",
+  "description": "Data-only mod that requires an Imlight integration API newer than the patched Director provides. The harness asserts it is rejected with dependency.version_mismatch (and that disabling it lets startup succeed under the Abort policy).",
+  "depends": { "imlight": "^1.3.0" }
+}

@@ -10,7 +10,10 @@ src/SpiralLoader.Api       public mod API — NO dependencies, ever. Mods refere
 src/SpiralLoader.Runtime   plugin manager — depends only on Api. Host-agnostic: no Imlight concepts.
 src/SpiralLoader.Imlight   Imlight bootstrap — depends on Runtime, NOT on any Imlight assembly.
 src/SpiralLoader.Host      headless host for dev/CI.
-examples/                  example mods (built into artifacts/mods by the build).
+examples/                  example mods (built into artifacts/mods by the build); standalone-mod is an out-of-tree template, not in the sln.
+tools/                     SpiralLoader.ApiSurface: prints/compares public API surfaces (shared source also linked into tests and the verify harness).
+api-baseline/<set>/        recorded public surfaces + diagnostic codes of a release set (1.2.0). Exact-match target = newest dir; older dirs = must-not-break.
+tests/fixtures/            sources of PREBUILT binaries committed under tests/SpiralLoader.Tests/Prebuilt (never rebuilt by the suite).
 tests/SpiralLoader.Tests   xUnit. References examples/host only for build order (ReferenceOutputAssembly=false).
 integration/imlight/       patches/ (git am series), setup + verify scripts, verify/ harness.
 external/                  git-ignored third-party checkouts (Imlight). Has an MSBuild barrier; keep it.
@@ -23,8 +26,9 @@ put logic in `SpiralLoader.Imlight` where it can be tested.
 
 ```bash
 dotnet build SpiralLoader.sln          # also assembles artifacts/mods/*
-dotnet test SpiralLoader.sln           # 153 tests, ~5 s
+dotnet test SpiralLoader.sln           # 172 tests, ~10 s (one runs `dotnet build` on examples/standalone-mod: filter Category!=ExternalBuild to skip)
 dotnet run --project src/SpiralLoader.Host -- --mods artifacts/mods --run "hello world" --plan-assets
+dotnet run --project src/SpiralLoader.Host -- --check --mod <mod folder> [--imlight-api 1.2.0]   # developer compatibility check, exit 0/1
 integration/imlight/verify/verify-patch.sh            # IMLIGHT_COMMIT=<sha> to test another Imlight commit
 pwsh integration/imlight/verify/Verify-Patch.ps1      # Windows twin
 ```
@@ -62,7 +66,8 @@ In the cloud container the SDK may not be on PATH: `export PATH=/root/.dotnet:$P
   `Logger` templates with `Logger.Args`, nullable disabled in CoreLib, no implicit usings, explicit `using`s
   sorted like the surrounding file, LF endings.
 - Diagnostic codes in `src/SpiralLoader.Runtime/ModDiagnostic.cs` are stable and documented in
-  `docs/architecture.md`; tests match codes, not messages. Add a code + doc row for every new failure mode.
+  `docs/architecture.md`; tests match codes, not messages. Add a code + doc row + a `DiagnosticHints` entry for every new
+  failure mode (`ApiCompatibilityTests` enforces all three, and that no released code disappears).
 - Determinism: anything ordered (discovery, resolution, dispatch, registries, asset plans) must not depend on
   filesystem or hash order.
 - Tests that need real assemblies compile them with `TestCompiler` (Roslyn) into a `ModWorkspace`; compiled mods
@@ -83,7 +88,14 @@ In the cloud container the SDK may not be on PATH: `export PATH=/root/.dotnet:$P
    must not appear), and update the verification table in
    `integration/imlight/README.md`. Do not stub the file under test.
 6. Bump `ImlightModding.IntegrationApiVersion` (minor for additions, major for breaks) and document hooks in
-   `docs/mod-authoring.md`.
+   `docs/mod-authoring.md`. The harness prints the public `Imlight.CoreLib.Modding` surface and both verify scripts compare it
+   with `api-baseline/<newest>/Imlight.CoreLib.Modding.txt`: record a new baseline set as `docs/api-compatibility.md` describes.
+
+## Changing the public API
+
+`SpiralLoader.Api` is compared with `api-baseline/` by `ApiCompatibilityTests`. Removing/changing a member, or changing a registry
+key name, event semantics or manifest meaning, is breaking; follow `docs/api-compatibility.md` (SemVer table, changelog, new
+baseline, new `AssemblyVersion`). Do not claim the API is frozen or stable.
 
 ## Integration expectations
 
