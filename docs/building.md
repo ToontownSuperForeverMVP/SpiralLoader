@@ -16,7 +16,7 @@ dotnet test SpiralLoader.sln
 ```
 
 `dotnet build` also assembles the example mods into installable folders under `artifacts/mods/`.
-The test suite (150 tests) covers versioning, manifests, dependency resolution and ordering, assembly loading
+The test suite (153 tests) covers versioning, manifests, dependency resolution and ordering, assembly loading
 and failure isolation (with mods compiled at test time by Roslyn), events, registries, asset planning,
 compatibility pins, the Imlight bootstrap, and an out-of-process run of the headless host.
 

@@ -15,7 +15,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="$(SpiralLoaderRepoRoot)src/SpiralLoader.Api/SpiralLoader.Api.csproj" Private="false" />
-    <ProjectReference Include="../ImlightPatchVerify.csproj" Private="false" />
+    <ProjectReference Include="../ImlightPatchVerify.csproj" Private="false" Condition="'$(ImlightDirectory)' == ''" />
   </ItemGroup>
   <Import Project="$(SpiralLoaderRepoRoot)build/SpiralLoader.Mod.targets" />
 </Project>
