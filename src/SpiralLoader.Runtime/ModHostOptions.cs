@@ -38,6 +38,12 @@ public sealed partial class ModHostOptions {
     /// <summary>Directories scanned for mods. Each immediate subdirectory with a manifest is one mod.</summary>
     public List<string> ModDirectories { get; } = [];
 
+    /// <summary>
+    /// Individual mod directories (each containing <c>spiralmod.json</c>) loaded in addition to those found under
+    /// <see cref="ModDirectories"/>. Lets a developer point the host straight at one build output.
+    /// </summary>
+    public List<string> ModFolders { get; } = [];
+
     /// <summary>Root for per-profile mod data: <c>DataRoot/profile/modid</c>.</summary>
     public string DataRoot { get; set; } = Path.Combine(AppContext.BaseDirectory, "moddata");
 

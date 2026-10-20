@@ -28,7 +28,8 @@ manifest, loaded once at server start.
 | `SpiralLoader.Api` | nothing | The only assembly mods must reference. Contracts, manifest model, versioning. Always provided by the host (`Private=false`). |
 | `SpiralLoader.Runtime` | Api | The plugin manager. Host-agnostic. |
 | `SpiralLoader.Imlight` | Runtime | Imlight bootstrap. **No Imlight references**: Imlight passes its INI section, identity and a log delegate in, so this is fully testable without Imlight. |
-| `SpiralLoader.Host` | Runtime | Headless host for development and CI; boots mods the same way the Imlight bootstrap does. |
+| `SpiralLoader.Host` | Runtime | Headless host for development and CI; boots mods the same way the Imlight bootstrap does; `--check` is the developer compatibility check. |
+| `tools/SpiralLoader.ApiSurface` | nothing | Prints and compares public API surfaces; its describer is also linked into the tests and the Imlight verify harness. Baselines live in `api-baseline/`. |
 | `integration/imlight/patches` | — | The patch series that adds hook points to Imlight (applied with `git am`). |
 | `integration/imlight/verify` | Imlight.Common, SpiralLoader.Imlight | Compiles the real patched Director against stubs and boots it. |
 
@@ -49,6 +50,9 @@ manifest, loaded once at server start.
    reject their members (and dependents); soft cycles are broken deterministically with a warning.
 6. **Load and initialize**, one mod at a time in order:
    - a required dependency that failed at this stage fails the mod (`dependency.failed`);
+   - each declared assembly's metadata is read first: a reference to a `SpiralLoader.Api` assembly version newer than
+     the host's fails the mod before any of its code runs (`assembly.api_newer`), an older one warns
+     (`assembly.api_older`). The API assembly version changes only for breaking API changes;
    - declared assemblies load into the mod's `ModLoadContext`, and `GetTypes()` is forced so an unresolvable
      reference fails the mod now, with a clear message;
    - entrypoints for the host's kind (`server`) are constructed (public parameterless constructor) and
@@ -168,7 +172,11 @@ created by `^`, `~` and wildcards exclude prereleases of the bound.
 
 ## Diagnostics
 
-Every problem is a `ModDiagnostic(Severity, Code, Message)` on the mod's record. Codes are stable:
+Every problem is a `ModDiagnostic(Severity, Code, Message)` on the mod's record. Codes are stable (and recorded in
+`api-baseline/`); messages name the mod's specifics (versions, folders, the real types in an assembly, the root cause
+and how much was rolled back). `ModDiagnostic.Hint` adds what to do about the code (`DiagnosticHints`), and the report
+prints it as a `fix:` line under each warning or error, after a `Needs attention:` line that names every failed mod and
+its codes. Codes:
 
 | Code | Meaning |
 | --- | --- |
@@ -184,7 +192,14 @@ Every problem is a `ModDiagnostic(Severity, Code, Message)` on the mod's record.
 | `assembly.missing` | Declared file missing (reject) |
 | `assembly.load_failed`, `entrypoint.not_found`, `entrypoint.invalid`, `init.failed` | Loading (fail) |
 | `assembly.shared_copy` | Mod shipped a host-provided assembly (warning) |
+| `assembly.api_newer` | The assembly was built against a newer `SpiralLoader.Api` (by assembly version) than the host provides (fail, before the mod's code runs) |
+| `assembly.api_older` | The assembly was built against an older `SpiralLoader.Api` than the host provides; it may need a rebuild (warning) |
 | `asset.invalid_path`, `asset.missing` | Asset declarations (reject) |
+| `asset.conflict` | Two mods override the same asset entry without an ordering between them (reported by the asset plan) |
+| `host.mods_directory_missing` | A configured mods directory does not exist (info, host-level, not tied to a mod) |
+
+The headless host's `--check` mode turns this report into a developer verdict (see
+[compatibility-testing.md](compatibility-testing.md)).
 
 ## Trust model
 
