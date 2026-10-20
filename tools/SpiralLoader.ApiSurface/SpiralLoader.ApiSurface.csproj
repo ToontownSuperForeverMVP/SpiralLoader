@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Prints or checks the public API surface of an assembly (see docs/api-compatibility.md). Used to record the
+    SpiralLoader.Api baseline under docs/api/ and to compare a build against it. No dependencies.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>SpiralLoader.ApiSurface</AssemblyName>
+    <RootNamespace>SpiralLoader.Tooling</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

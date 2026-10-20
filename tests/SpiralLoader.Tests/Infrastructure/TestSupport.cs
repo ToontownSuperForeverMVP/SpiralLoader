@@ -138,12 +138,20 @@ public static class TestCompiler {
             .ToList();
     });
 
-    public static void Compile(string assemblyName, string source, string outputPath, IEnumerable<string>? references = null) {
+    /// <param name="referenceHostApi">
+    /// False to leave out the real SpiralLoader.Api, so a test can supply a differently versioned stand-in through
+    /// <paramref name="references"/> and compile a mod that records a different API version in its metadata.
+    /// </param>
+    public static void Compile(string assemblyName, string source, string outputPath, IEnumerable<string>? references = null,
+                               bool referenceHostApi = true) {
         var syntax = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest));
+        var hostApi = typeof(ISpiralMod).Assembly.Location;
         var compilation = CSharpCompilation.Create(
             assemblyName,
             [syntax],
-            s_frameworkReferences.Value.Concat((references ?? []).Select(path => MetadataReference.CreateFromFile(path))),
+            s_frameworkReferences.Value
+                .Where(reference => referenceHostApi || reference.Display != hostApi)
+                .Concat((references ?? []).Select(path => MetadataReference.CreateFromFile(path))),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
         var result = compilation.Emit(outputPath);
         if (!result.Success) {
@@ -161,6 +169,12 @@ public static class BuildPaths {
     public static string ExampleModsDirectory => Metadata("ExampleModsDirectory");
 
     public static string HeadlessHostPath => Metadata("HeadlessHostPath");
+
+    public static string PrebuiltDirectory => System.IO.Path.Combine(RepoRoot, "tests", "SpiralLoader.Tests", "Prebuilt");
+
+    public static string RepoRoot => Metadata("RepoRoot");
+
+    public static string ApiBaselineDirectory => System.IO.Path.Combine(RepoRoot, "api-baseline");
 
     private static string Metadata(string key)
         => typeof(BuildPaths).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().Single(a => a.Key == key).Value!;
@@ -195,5 +209,34 @@ public static class TestJournal {
     public static string NewChannel() => Guid.NewGuid().ToString("N");
 
     public static string AssemblyPath => typeof(TestJournal).Assembly.Location;
+
+}
+
+/// <summary>Runs a child process and captures its output; used for the headless host and for building a mod outside the repository.</summary>
+public static class ProcessRunner {
+
+    public static async Task<(int ExitCode, string Output)> RunAsync(string fileName, string workingDirectory, params string[] arguments) {
+        var start = new System.Diagnostics.ProcessStartInfo(fileName) {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in arguments) {
+            start.ArgumentList.Add(argument);
+        }
+
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        await process.WaitForExitAsync(timeout.Token);
+        return (process.ExitCode, await stdout + await stderr);
+    }
+
+    public static string DotNet => Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
+
+    /// <summary>Runs <c>SpiralLoader.Host</c> (the headless host) with the given arguments.</summary>
+    public static Task<(int ExitCode, string Output)> RunHostAsync(string workingDirectory, params string[] arguments)
+        => RunAsync(DotNet, workingDirectory, [BuildPaths.HeadlessHostPath, .. arguments]);
 
 }
