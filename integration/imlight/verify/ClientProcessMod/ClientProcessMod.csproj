@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    A separately compiled mod for the verification harness. It references only SpiralLoader.Api and the harness
+    assembly, which stands in for Imlight.CoreLib (and the Imcodec message types); both are host-provided
+    (Private=false). Imlight's internals, such as MessageService, are invisible to it, as in a real mod.
+  -->
+  <Import Project="$(SpiralLoaderRepoRoot)build/SpiralLoader.Mod.props" />
+  <PropertyGroup>
+    <SpiralModId>client-process-verify</SpiralModId>
+    <AssemblyName>ClientProcessVerifyMod</AssemblyName>
+    <SpiralModOutputRoot>$(MSBuildThisFileDirectory)../bin/mods/</SpiralModOutputRoot>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Upstream Imlight.Common pins Akka.Remote 1.5.0 (advisory GHSA-jhpv-4q4f-43g5); not ours to fix here. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SpiralLoaderRepoRoot)src/SpiralLoader.Api/SpiralLoader.Api.csproj" Private="false" />
+    <ProjectReference Include="../ImlightPatchVerify.csproj" Private="false" />
+  </ItemGroup>
+  <Import Project="$(SpiralLoaderRepoRoot)build/SpiralLoader.Mod.targets" />
+</Project>

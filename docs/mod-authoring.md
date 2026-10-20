@@ -93,7 +93,7 @@ Change filter-style events by setting their properties. Call `Cancel()` on a `Ca
 lower-priority handlers and the host's default action. Use `EventPriority.Monitor` to observe the final
 state without changing it.
 
-## 5. Imlight hooks (integration API 1.1.0)
+## 5. Imlight hooks (integration API 1.2.0)
 
 Reference `Imlight.CoreLib` (via `ImlightDirectory`) and use `Imlight.CoreLib.Modding`:
 
@@ -103,9 +103,10 @@ Reference `Imlight.CoreLib` (via `ImlightDirectory`) and use `Imlight.CoreLib.Mo
 | `LootGrantingEvent` | event | Change `Results` (items, gold, experience) before loot is granted |
 | `CharacterListSentEvent` | event (1.1) | After the character list reaches the client; `Send(IMessage)` writes to the client's login socket |
 | `GameServerSelectingEvent` | cancellable event (1.1) | Route a player to a realm or veto the transition after they pick a character |
-| `ImlightRegistries.ClientProcessJobs` | registry of `uint` (1.1) | Claim client process `JobID`s so Imlight's `MinigameService` leaves them alone |
-| `ImlightRegistries.GameMessageServices` | registry of `Type` | Extra per-session game services |
-| `ImlightRegistries.LoginMessageServices` | registry of `Type` | Extra per-session login services |
+| `ImlightRegistries.ClientProcessJobs` | registry of `uint` (1.1) | Claim client process `JobID`s so Imlight's `MinigameService` leaves them alone; since 1.2 their replies reach only your services |
+| `ModMessageService` | base class (1.2) | Write per-session message services in a separately compiled mod (`[MessageHandler]`, `SendToSocket`, `GetSocketAccount`, `StartClientProcess`, `OnSessionEnded`) |
+| `ImlightRegistries.GameMessageServices` | registry of `Type` | Extra per-session game services (`ModMessageService` types since 1.2) |
+| `ImlightRegistries.LoginMessageServices` | registry of `Type` | Extra per-session login services (`ModMessageService` types since 1.2) |
 | `CommonRegistries.Commands` | registry of `ModCommand` | Chat commands (`.name`), tried after built-in commands; `OperatorOnly` (default) requires Administrator |
 
 ### Hooks added in 1.1.0
@@ -130,8 +131,11 @@ context.Events.Subscribe<CharacterListSentEvent>(e =>
 - Set `RealmName` to the *exact* realm name of a configured game server: the player is sent there (the lookup is
   the one `MSG_QUERYREALMSERVER` already does). A name that matches no game server logs an error and
   rejects the transition; a mod never silently sends players somewhere else.
-- `Cancel()` rejects the transition: the client receives `MSG_CHARACTERSELECTED` with `Error = 1` (Imlight
-  also closes the session on the pinned commit; newer upstream leaves it to the client). Lower-priority handlers do not run, so a veto cannot be overridden by a later handler.
+- `Cancel()` rejects the transition: the client receives `MSG_CHARACTERSELECTED` with `Error = 1`. What happens to
+  the session then depends on the Imlight revision, because the hook reuses the service's own error path: on the
+  pinned `b0798716` that path also closes the session; on `quality-assurance` `2a16010e` it only sends the error
+  and the session stays open. The verification harness asserts both. Lower-priority handlers do not run, so a
+  veto cannot be overridden by a later handler.
 
 **`ImlightRegistries.ClientProcessJobs`.** A mod that starts a client process (`MSG_START_CLIENT_PROCESS`) with
 its own `JobID` registers that id during `Initialize`:
@@ -143,15 +147,72 @@ context.Registries.Get(ImlightRegistries.ClientProcessJobs).Register("menu", 770
 Claimed ids (a) are unique across mods: a second claim of the same id fails the second mod's `Initialize` with
 `init.failed` and rolls it back; `0` is reserved; (b) are ignored by `MinigameService`, which otherwise receives
 every `MSG_MESSAGE_PROCESS` through Imlight's fan-out dispatch, tries to decode it as minigame traffic and logs
-an error; and (c) are never allocated by `ProcessSupervisor` to a minigame. Your own message service (see
-`LoginMessageServices` / `GameMessageServices`) still receives the packet and should check the `JobID` itself.
+an error; and (c) are never allocated by `ProcessSupervisor` to a minigame. Since 1.2.0 (d) the client's replies
+for a claimed id reach only the `ModMessageService`s of the mod that claimed it (next section).
 `ImlightModding.IsClientProcessJobClaimed(uint)` tells you whether an id is claimed. Pick ids well away from the
 random range Imlight allocates (`1 … int.MaxValue`) only if you do not claim them; claimed ids are safe anywhere.
 
-### Access to internals
+### Hooks added in 1.2.0: mod message services and client process replies
 
-Imlight's `MessageService` base class is `internal`, so a separately compiled mod cannot derive from it yet.
-See [audit.md §2](audit.md#access-to-imlight-internals) and the next milestone.
+Mods that use them declare `"imlight": "^1.2.0"`.
+
+Imlight's own `MessageService` base class is `internal`, so a separately compiled mod cannot derive from it.
+Derive from the public **`Imlight.CoreLib.Modding.ModMessageService`** instead and register the type in
+`ImlightRegistries.LoginMessageServices` (character select, where `CharacterListSentEvent` runs) or
+`GameMessageServices` (in-game). The type needs a public parameterless constructor; the registry validator
+rejects anything else in your `Initialize`.
+
+```csharp
+public sealed class MyMod : ISpiralMod {
+    public const uint MenuJob = 770101;
+
+    public void Initialize(IModContext context) {
+        context.Registries.Get(ImlightRegistries.ClientProcessJobs).Register("menu", MenuJob);
+        context.Registries.Get(ImlightRegistries.LoginMessageServices).Register("menu_replies", typeof(MenuReplies));
+        context.Events.Subscribe<CharacterListSentEvent>(e =>
+            e.Send(new GAME_5_PROTOCOL.MSG_START_CLIENT_PROCESS { JobID = MenuJob, ScriptName = "MyMod/Menu.lua" }));
+    }
+}
+
+public sealed class MenuReplies : ModMessageService {
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS))]
+    private void OnMenuReply(GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS reply) {
+        var account = GetSocketAccount();
+        // ... act on reply.Message, then for example close the menu:
+        SendToSocket(new GAME_5_PROTOCOL.MSG_KILL_CLIENT_PROCESS { JobID = reply.JobID });
+    }
+}
+```
+
+How it works and what you can rely on:
+
+- **One instance per session.** Imlight creates your service when a session starts, inside an internal host
+  service that is a real `MessageService` child of the session's `SessionActor`. The session's own dispatch table
+  routes every message type your `[MessageHandler]` methods declare (`Imlight.CoreLib.Shared.Networking.MessageHandlerAttribute`,
+  the attribute Imlight's services use) to that host, which calls your handlers. A handler may take the message
+  or no parameter. Declare handlers on the registered type; on a base class they must not be `private`. As for
+  Imlight's own services, the session routes by the packet's exact type, so declare concrete message types.
+- **Akka threading.** Handlers run on the host actor's thread, one message at a time, like Imlight's own
+  services. Do not block, do not share the instance across threads, keep per-session state in the instance.
+- **Helpers.** `SendToSocket(IMessage)` sends to this session's client. `GetSocketAccount()` returns the
+  session's account (one ask to the session's account service, then cached). `SessionId` and `OwnerModId` identify
+  the instance. `StartClientProcess(jobId, script)` sends `MSG_START_CLIENT_PROCESS` for an id **your** mod
+  claimed and throws `InvalidOperationException` for any other id. The helpers are not available in the
+  constructor.
+- **Client process routing.** `MSG_MESSAGE_PROCESS` and `MSG_CLIENT_PROCESS_TERMINATED` carry a `JobID`. They
+  reach only the services of the mod that claimed that id; an unclaimed id reaches no mod service and stays with
+  `MinigameService`. Two mods can therefore both declare a `MSG_MESSAGE_PROCESS` handler without seeing each
+  other's replies, and a mod never sees minigame traffic.
+- **Faults.** If your constructor throws, the service is logged against your mod and left out of that session;
+  if a handler throws, the error is logged and the next message is handled normally. Neither stops the session
+  or other services (on both supported Imlight revisions, whose supervision strategies differ).
+- **Session end.** Override `OnSessionEnded()` to release per-session state. It runs during Imlight's pre-dispose
+  step, while the session's other services still run; Imlight waits at most two seconds for all services.
+- **Without mods.** With no `ModMessageService` registered the host is not added and the service factories return
+  their built-in sets; a disabled mod's registrations do not exist, so its job ids go back to `MinigameService`.
+
+Other messages fan out as in Imlight: if your service and a built-in service both handle a message type, both
+receive it.
 
 Not available yet (planned, see [next-milestone.md](next-milestone.md)): zone entity template, NPC stat, combat
 spell and world teleport list hooks, and zone component contributions.

@@ -5,10 +5,11 @@ in the spirit of Fabric for Minecraft: a small loader, a stable mod API, and a m
 the server. Mods are separately compiled .NET 10 assemblies plus data, described by a `spiralmod.json`
 manifest and loaded once at server start.
 
-> **Status: milestone 1 (foundation).** The loader, API, headless host, Imlight bootstrap and an Imlight patch
-> series exist and are tested. The first acceptance target, running
-> [Spiral Shuffle](https://github.com/ljste/spiral-shuffle) as a standalone mod, needs the hook points and
-> internals access listed in [docs/next-milestone.md](docs/next-milestone.md).
+> **Status: milestone 2 (integration API 1.2.0).** The loader, API, headless host, Imlight bootstrap and an
+> Imlight patch series exist and are tested, including a public `ModMessageService` bridge through which a
+> separately compiled mod receives its own client process replies. The first acceptance target, running
+> [Spiral Shuffle](https://github.com/ljste/spiral-shuffle) as a standalone mod, still needs the hook points
+> listed in [docs/next-milestone.md](docs/next-milestone.md).
 
 ## What works
 
@@ -19,10 +20,11 @@ manifest and loaded once at server start.
   libraries stay private. Restart-required by design (no unloading).
 - Typed event bus (priorities, cancellation, fault isolation, lock-free after startup), namespaced registries,
   rollback of a failed mod's registrations, lifecycle events, logging.
-- Imlight hooks (patch series): loader start and lifecycle events, mod message services, `LootGrantingEvent`,
-  mod chat commands, `CharacterListSentEvent`, `GameServerSelectingEvent`, a client process job-id registry,
-  tolerant assembly scanning. Verified by booting the real patched Director against stubs
-  on both the pinned and the current upstream Imlight commit.
+- Imlight hooks (patch series): loader start and lifecycle events, mod message services (`ModMessageService`,
+  usable from a separately compiled mod), `LootGrantingEvent`, mod chat commands, `CharacterListSentEvent`,
+  `GameServerSelectingEvent`, a client process job-id registry with per-mod reply routing, tolerant assembly
+  scanning. Verified by booting the real patched Director, with Imlight's real `SessionActor` dispatch, against
+  stubs on both the pinned and the current upstream Imlight commit.
 - Asset declarations for client archives and SpiralDB, with deterministic overlay planning and conflict
   detection (writing archives is future work).
 

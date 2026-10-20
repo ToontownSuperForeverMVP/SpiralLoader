@@ -18,16 +18,20 @@ applies cleanly to `2a16010e59b95cc449d8e21542fbf38440e06bcf` (`quality-assuranc
 | 0005 | `feat: route unknown chat commands to mod commands` | `CommandDispatcher` fallback |
 | 0006 | `fix: tolerate unloadable types when scanning assemblies` | `AssemblyTypes.LoadableTypes` used by the requirement, result and zone component registries |
 | 0007 | `feat: publish CharacterListSentEvent after the character list is sent` | `CharacterService.ReceiveRequestCharacterList`, `CharacterListSentEvent` |
-| 0008 | `feat: let mods route or veto the game server selection` | `GameTransitionService` (`SelectGameServer`), `GameServerSelectingEvent` |
+| 0008 | `feat: let mods route or veto the game server selection` | `GameTransitionService` (`TrySelectModGameServer`), `GameServerSelectingEvent`. A veto reuses the service's error path, which closes the session at b0798716 but not at 2a16010e (documented on the event, asserted per revision) |
 | 0009 | `feat: let mods claim client process job ids` | `ImlightRegistries.ClientProcessJobs`, `ImlightModding.IsClientProcessJobClaimed`, `MinigameService`, `ProcessSupervisor`, registry declaration in `Program.cs` |
 | 0010 | `feat: raise the mod integration API to 1.1.0` | `ImlightModding.IntegrationApiVersion` |
+| 0011 | `feat: let separately compiled mods provide message services` | New `Modding/ModMessageService.cs` (public `ModMessageService`, internal `ModMessageServiceHost` + game/login hosts); `ImlightModding.ValidateMessageService` / `WithModServices`; both service factories; `ReceiveProtocolDispatcher.MessageHandlers` gets a `protected` setter |
+| 0012 | `feat: route claimed client process replies to the claiming mod` | Job id → owner table in `ImlightModding`; host routes `MSG_MESSAGE_PROCESS` / `MSG_CLIENT_PROCESS_TERMINATED` by owner; `ModMessageService.StartClientProcess` |
+| 0013 | `feat: raise the mod integration API to 1.2.0` | `ImlightModding.IntegrationApiVersion` |
 
 Dependency direction: `Imlight.CoreLib → SpiralLoader.Api` (no third-party dependencies) and
 `Imlight.Director → SpiralLoader.Imlight → SpiralLoader.Runtime`. CoreLib never references the runtime.
 
 Behaviour without mods: `ImlightModding.Events` is `NullEventBus` until the Director attaches the loader; with
 no `mods/` folder (or `Enabled = false`) every call site is a single `HasSubscribers` check returning false and
-every service factory returns its built-in set unchanged.
+every service factory returns its built-in set unchanged (no mod service host is added unless a
+`ModMessageService` is registered). The harness's second run asserts this with the client-process mods disabled.
 
 ## Scripts
 
@@ -40,19 +44,48 @@ every service factory returns its built-in set unchanged.
 ## Verification status
 
 "Compiled" means the real patched Imlight file is compiled by the harness against stubs of the Imcodec-generated
-types (`verify/ImcodecStubs.cs`, which follow how the pinned source uses those types). "Executed" means the
-harness drives it (`verify/Scenarios.cs`) and `verify/expected-output.txt` asserts the result.
+types (`verify/ImcodecStubs.cs`, which follow how the pinned source uses those types) and of the few Imlight
+packet classes that need generated zone types (`ZONE_102_PROTOCOL`, `CHARACTER_103_PROTOCOL`, in
+`verify/Stubs.cs`). "Executed" means the harness drives it (`verify/Scenarios.cs`) and the expected-output files
+assert the result. Everything below holds for both b0798716 and 2a16010e, with both verify scripts.
 
 | Part | How verified |
 | --- | --- |
 | Series applies to b0798716 and 2a16010e | `git am` in the verification scripts |
 | `Program.cs`, `ImlightModding.cs`, `ImlightEvents.cs`, `AssemblyTypes.cs`, `GameServiceFactory.cs`, `LoginServiceFactory.cs`, `ServiceFactory.cs`, `ZoneEntityComponentRegistry.cs` | Compiled (real patched files) and executed by the harness |
-| `CharacterService.cs` (`CharacterListSentEvent`) | Compiled; the character-list request is executed: event fires after `MSG_CHARACTERLIST`, a mod `Send` arrives last on the socket |
-| `GameTransitionService.cs` (`GameServerSelectingEvent`) | Compiled; executed for default, mod-chosen realm (`MSG_QUERYREALMSERVER`), veto and unknown realm |
-| `MinigameService.cs` (claimed job ids) | Compiled; `MSG_MESSAGE_PROCESS` for a claimed id is not decoded, an unclaimed one is |
+| `SessionActor.cs`, `MessageService.cs`, `ReceiveProtocolDispatcher.cs`, `MessageHandlerTable.cs`, `Exceptions.cs`, `IHandshakeService.cs`, `ACCOUNT_104_PROTOCOL.cs`, `OnlinePlayer.cs` | Compiled (real) and executed: every scenario runs in a real `SessionActor` created from the real patched factories; client packets enter through `MSG_RECEIVEDPACKET` → `HandlePacket` → the session's dispatch table → the services; sessions close through the real dispose path. Only `SocketListener`/`SocketSender` are stubbed |
+| `ModMessageService.cs` (0011, 0012) | Compiled; executed with three separately compiled mods that reference only `SpiralLoader.Api` and the public harness surface (the harness reports `MessageService.public=False`). Asserted: a mod claims 770101, starts the menu process from `CharacterListSentEvent` and its login `ModMessageService` receives the synthetic `MSG_MESSAGE_PROCESS` reply and answers the client; in a game session a claimed reply reaches only the owning mod's service and is not decoded by `MinigameService`, while rolled-back and unclaimed ids are decoded by `MinigameService` and reach no mod; `MSG_CLIENT_PROCESS_TERMINATED` follows the same routing; `StartClientProcess` refuses another mod's id; a throwing handler and a throwing constructor are logged against their mod and the session keeps working; `OnSessionEnded` runs for every session; a duplicate claim fails the second mod (`init.failed`) and rolls back its service and its other claim while the first mod's claim keeps working; with the mods disabled the factories and all replies are vanilla |
+| `CharacterService.cs` (`CharacterListSentEvent`) | Compiled; executed: event fires after `MSG_CHARACTERLIST`, a mod `Send` arrives last on the socket |
+| `GameTransitionService.cs` (`GameServerSelectingEvent`) | Compiled; executed for default, mod-chosen realm (`MSG_QUERYREALMSERVER`), veto and unknown realm; whether the error closes the session is asserted per revision (closes at b0798716, stays open at 2a16010e) |
+| `MinigameService.cs` (claimed job ids) | Compiled; executed in a real game session (see `ModMessageService.cs`) |
 | `ProcessSupervisor.cs` (skips claimed ids) | Compiled only (the id is random, so no scenario) |
-| `SERVER_100_PROTOCOL.cs`, `SERVICE_101_PROTOCOL.cs`, `PROCESS_107_PROTOCOL.cs`, `ReceiveProtocolDispatcher.cs`, `MessageHandlerTable.cs`, `ServerInterfaces.cs` | Compiled (real, unmodified) so that dispatch and the server messages are the genuine ones |
+| `SERVER_100_PROTOCOL.cs`, `SERVICE_101_PROTOCOL.cs`, `PROCESS_107_PROTOCOL.cs`, `ServerInterfaces.cs` | Compiled (real, unmodified) so that dispatch and the server messages are the genuine ones |
 | Commit stamping targets in `Imlight.Director.csproj` | Exercised in isolation (git checkout, no git, explicit property) |
 | `LootGranter.cs`, `CommandDispatcher.cs`, `RequirementDispatcher.cs`, `ResultDispatcher.cs` edits | Reviewed only: these files need Imcodec generated types. Requires a full local build |
-| Generated-type assumptions in the 1.1.0 call sites | **Unverified here**: that `MSG_MESSAGE_PROCESS.JobID` is a `uint` (`MinigameService` passes it to `IsClientProcessJobClaimed(uint)`), that `MSG_CHARACTERLIST` etc. are `IMessage`, and that `Wizard`/`Account` members match the stubs. A full local build confirms them |
-| Whole `Imlight.CoreLib` / `Imlight.Director` build and a game client session | Not done in the cloud: needs the Imcodec generator inputs and Wizard101 data |
+| Generated-type assumptions in the 1.1.0/1.2.0 call sites | **Unverified here**: that `MSG_MESSAGE_PROCESS.JobID` and `MSG_CLIENT_PROCESS_TERMINATED.JobID` are `uint`, `MSG_MESSAGE_PROCESS.Message` a `string`, `MSG_START_CLIENT_PROCESS` has settable `JobID`/`ScriptName`, the generated messages are `IMessage`, and `Wizard`/`Account` members match the stubs. A full local build confirms them |
+| Whole `Imlight.CoreLib` / `Imlight.Director` build and a game client session | Not done in the cloud: needs the Imcodec generator inputs and Wizard101 data. No client Lua was executed |
+
+## Remaining local tests (Windows, real Imcodec inputs and client)
+
+The cloud harness proves the server-side round trip with synthetic packets. These checks need a local machine and
+were **not** run here:
+
+1. **Full build at both revisions.** `Setup-Imlight.ps1` (and `-Commit 2a16010e59b95cc449d8e21542fbf38440e06bcf`), then
+   a Release build of `Imlight.Director` with the Imcodec generator inputs. Confirms the generated-type
+   assumptions above, in particular that `ModMessageService.cs` compiles against the real `GAME_5_PROTOCOL`.
+2. **Bridge mod against the real `Imlight.CoreLib.dll`.** Build `integration/imlight/verify/ClientProcessMod` (or
+   an equivalent mod) with `-p:ImlightDirectory=<built server>` instead of the harness reference; it must compile
+   without `IgnoresAccessChecksTo` or a publicizer and load with `"imlight": "^1.2.0"`.
+3. **Real client round trip at character select.** Install the mod, ship `Verify/Menu.lua` (a script that calls
+   `SendProcessMessage`) in the client's `Root.wad`, log in, and check the log for the mod's reply handler, no
+   `Failed to deserialize message process` from `MinigameService`, and the client closing the menu on
+   `MSG_KILL_CLIENT_PROCESS`.
+4. **Real client round trip in game.** A game-side `ModMessageService` starting a process with
+   `StartClientProcess` and receiving its reply; a minigame (for example Skull Riders) must still work alongside it.
+5. **Session lifetime.** Log out and disconnect at character select and in game; confirm `OnSessionEnded` runs once
+   per session and the session id is freed (no `SessionActor` left behind) on both revisions.
+6. **Veto behaviour per revision.** Cancel `GameServerSelectingEvent` with a real client. The harness shows the
+   server closing the session at b0798716 and keeping it open at 2a16010e; record what the client shows in each
+   case.
+7. **Vanilla regression.** Run with no `mods/` folder and with the mods listed in `DisabledMods`; minigames, login
+   and zone transfers behave exactly as unpatched Imlight.

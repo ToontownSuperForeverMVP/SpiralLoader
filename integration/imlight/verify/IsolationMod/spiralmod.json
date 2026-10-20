@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "isolation-verify",
+  "version": "1.0.0",
+  "name": "Client Process Owner Isolation Verification",
+  "description": "A second mod with its own job id and services, a handler that throws and a service whose constructor throws.",
+  "entrypoints": { "server": ["IsolationVerifyMod.IsolationMod"] },
+  "assemblies": ["IsolationVerifyMod.dll"],
+  "depends": { "spiralloader": ">=0.1.0", "imlight": "^1.2.0" }
+}
