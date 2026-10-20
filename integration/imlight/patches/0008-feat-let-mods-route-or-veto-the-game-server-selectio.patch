@@ -1,7 +1,7 @@
-From fd2db187e2fd76028e5a98068f4e0454898b3af2 Mon Sep 17 00:00:00 2001
+From d18a4e15d55689d868db11bf0f0e057de78a1a88 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 16:48:08 +0000
-Subject: [PATCH 08/10] feat: let mods route or veto the game server selection
+Subject: [PATCH 08/13] feat: let mods route or veto the game server selection
 
 GameServerSelectingEvent lets mods choose the realm a player is sent to
 or cancel the transition. Imlight's own best-server choice is used when
@@ -11,8 +11,8 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 Claude-Session: [AI session link removed]
 ---
  .../Login/Services/GameTransitionService.cs   | 56 +++++++++++++++++++
- src/Imlight.CoreLib/Modding/ImlightEvents.cs  | 23 ++++++++
- 2 files changed, 79 insertions(+)
+ src/Imlight.CoreLib/Modding/ImlightEvents.cs  | 25 +++++++++
+ 2 files changed, 81 insertions(+)
 
 diff --git a/src/Imlight.CoreLib/Login/Services/GameTransitionService.cs b/src/Imlight.CoreLib/Login/Services/GameTransitionService.cs
 index 5e4b3e36..014acb6d 100644
@@ -97,7 +97,7 @@ index 5e4b3e36..014acb6d 100644
          
          return AskServer<SERVER_100_PROTOCOL.MSG_SERVERINFO>(msg);
 diff --git a/src/Imlight.CoreLib/Modding/ImlightEvents.cs b/src/Imlight.CoreLib/Modding/ImlightEvents.cs
-index 1df14387..5b11dd24 100644
+index 1df14387..f7d13402 100644
 --- a/src/Imlight.CoreLib/Modding/ImlightEvents.cs
 +++ b/src/Imlight.CoreLib/Modding/ImlightEvents.cs
 @@ -41,6 +41,7 @@ using Akka.Actor;
@@ -108,7 +108,7 @@ index 1df14387..5b11dd24 100644
  
  namespace Imlight.CoreLib.Modding;
  
-@@ -81,3 +82,25 @@ public sealed class CharacterListSentEvent(Account account, Action<IMessage> sen
+@@ -81,3 +82,27 @@ public sealed class CharacterListSentEvent(Account account, Action<IMessage> sen
      }
  
  }
@@ -117,7 +117,9 @@ index 1df14387..5b11dd24 100644
 +/// Published by the login server's <c>GameTransitionService</c> when a player has selected a character and
 +/// Imlight is about to choose the game server (realm) to send them to. Set <see cref="RealmName"/> to route the
 +/// player to a specific realm. <see cref="CancellableEvent.Cancel"/> rejects the transition: the client receives
-+/// an error and the session closes.
++/// <c>MSG_CHARACTERSELECTED</c> with an error. What happens to the session then depends on the Imlight revision,
++/// because the patch reuses the service's own error path: at b0798716 (the pinned revision) that path also closes
++/// the session; at quality-assurance 2a16010e it only sends the error and leaves the session open.
 +/// </summary>
 +public sealed class GameServerSelectingEvent(Account account, Wizard character) : CancellableEvent {
 +

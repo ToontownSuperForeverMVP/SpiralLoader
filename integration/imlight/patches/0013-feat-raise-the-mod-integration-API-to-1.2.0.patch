@@ -1,0 +1,32 @@
+From 061560f420ba08b1910b6699631e8c09b16e3194 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 20 Oct 2026 00:21:18 +0000
+Subject: [PATCH 13/13] feat: raise the mod integration API to 1.2.0
+
+ModMessageService, its registration through the game and login message
+service registries, client process routing by claimed job id and
+ModMessageService.StartClientProcess are additions, so the minor
+version goes up.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: [AI session link removed]
+---
+ src/Imlight.CoreLib/Modding/ImlightModding.cs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/Imlight.CoreLib/Modding/ImlightModding.cs b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+index 0b67f882..51871b49 100644
+--- a/src/Imlight.CoreLib/Modding/ImlightModding.cs
++++ b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+@@ -62,7 +62,7 @@ public static class ImlightModding {
+     /// Version of Imlight's mod-facing surface (events, registries, behaviors). Exposed to mods as the
+     /// <c>imlight</c> dependency. Bump the major version on breaking changes to any of it.
+     /// </summary>
+-    public const string IntegrationApiVersion = "1.1.0";
++    public const string IntegrationApiVersion = "1.2.0";
+ 
+     private const string NoPermissionReply = "You do not have permission to use this command.";
+ 
+-- 
+2.43.0
+

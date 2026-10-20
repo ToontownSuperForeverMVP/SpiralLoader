@@ -1,7 +1,7 @@
-From 0eb33d36593d5b85b5f5f3a2a4e6d1e263adbdf2 Mon Sep 17 00:00:00 2001
+From 337c41f87571ac1c125dc0773b378473669ecd09 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 05:26:14 +0000
-Subject: [PATCH 03/10] feat: let mods add game and login message services
+Subject: [PATCH 03/13] feat: let mods add game and login message services
 
 Game and login service factories append the service types mods register
 under ImlightRegistries.GameMessageServices / LoginMessageServices. Types

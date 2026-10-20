@@ -16,7 +16,7 @@ dotnet test SpiralLoader.sln
 ```
 
 `dotnet build` also assembles the example mods into installable folders under `artifacts/mods/`.
-The test suite (150 tests) covers versioning, manifests, dependency resolution and ordering, assembly loading
+The test suite (153 tests) covers versioning, manifests, dependency resolution and ordering, assembly loading
 and failure isolation (with mods compiled at test time by Roslyn), events, registries, asset planning,
 compatibility pins, the Imlight bootstrap, and an out-of-process run of the headless host.
 
@@ -44,18 +44,29 @@ pwsh integration/imlight/verify/Verify-Patch.ps1     # Windows
 ```
 
 This clones Imlight at the pinned commit into `external/`, applies `integration/imlight/patches`, compiles the
-**real patched** `Program.cs` and new CoreLib files against functional stubs (plus the real `Imlight.Common`,
-Akka and SpiralLoader), boots `Program.Main` with `hello-spiral` and a mod that registers a game message
-service, and checks the output: loader report through Imlight's logger, lifecycle events, and mod services
-merged by the real patched service factories. Set `IMLIGHT_COMMIT` (bash) or `-Commit` (PowerShell) to verify
-another Imlight commit; both `b07987168fcf…` and `2a16010e59b9…` pass.
+**real patched** `Program.cs`, the modding files, Imlight's real session plumbing (`SessionActor`,
+`MessageService`, `ReceiveProtocolDispatcher`, `MessageHandlerTable`) and the hook call-site services
+(`CharacterService`, `GameTransitionService`, `MinigameService`, `ProcessSupervisor`) against functional stubs
+(plus the real `Imlight.Common`, Akka and SpiralLoader). It builds `hello-spiral` and four separately compiled
+verification mods that see only the public surface, then boots `Program.Main` twice:
 
-Since integration API 1.1.0 the harness also compiles the real patched `CharacterService`,
-`GameTransitionService`, `MinigameService` and `ProcessSupervisor` (with Imlight's real packet, dispatcher and
-message-handler files) and drives the first three through a recording stub session and a stub game server
-(`verify/Scenarios.cs`), asserting the results listed in `verify/expected-output.txt`. Imcodec's generated
-types are stubbed in `verify/ImcodecStubs.cs`; those stubs follow how the pinned source uses the types and
-cannot prove they match the generated code.
+1. **With every mod** (`FailurePolicy = Continue`, so the deliberately failing `duplicate-claim-verify` is reported
+   rather than aborting). `verify/Scenarios.cs` creates real `SessionActor`s from the real patched service
+   factories and injects synthetic client packets exactly as `SocketListener` does (`MSG_RECEIVEDPACKET`): the
+   character list, the client's `MSG_MESSAGE_PROCESS` reply to the menu process a mod started from
+   `CharacterListSentEvent`, game server selection, and a game session with replies for owned, foreign, rolled-back
+   and unclaimed job ids, a faulting handler and a process termination. Asserted: `verify/expected-output.txt`, plus
+   `verify/expected-output-<commit12>.txt` for revision-specific behaviour (whether a rejected game server selection
+   closes the session).
+2. **With the client-process mods disabled** (`DisabledMods`), asserting `verify/expected-vanilla-output.txt`:
+   no mod service host, no claims, and every client process reply decoded by `MinigameService` as unmodded Imlight
+   does.
+
+Expectation lines starting with `!` must not appear. Set `IMLIGHT_COMMIT` (bash) or `-Commit` (PowerShell) to
+verify another Imlight commit; both `b07987168fcf…` and `2a16010e59b9…` pass. Imcodec's generated types are
+stubbed in `verify/ImcodecStubs.cs`, and the `ZONE_102`/`CHARACTER_103` packet classes (which need dozens of
+generated zone types) in `verify/Stubs.cs`; those stubs follow how the pinned source uses the types and cannot
+prove they match the generated code.
 
 What it does **not** prove: that all of the patched `Imlight.CoreLib` compiles. The `LootGranter` and
 `CommandDispatcher` call sites, and everything else that needs Imcodec's generated types, are only compiled by

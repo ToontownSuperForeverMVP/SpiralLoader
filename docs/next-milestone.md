@@ -12,12 +12,13 @@ copying or string replacement**. Client assets keep using Spiral Shuffle's exist
 Add one commit per hook. Each must be a no-op when nothing subscribes (`HasSubscribers` guard), use only
 public Imlight types in its event, and be listed in `docs/mod-authoring.md` and `docs/audit.md`.
 
-**Status (milestone 2, integration API 1.1.0):** rows 1, 2 and 7 below are implemented (patches 0007-0010):
-`CharacterListSentEvent`, `GameServerSelectingEvent` and `imlight:client_process_jobs`. They were verified
-by the cloud harness (real call-site files compiled against Imcodec stubs and driven by scenarios, on both
-supported Imlight revisions) but **not** by a full Imlight build or a client session; see
-[integration/imlight/README.md](../integration/imlight/README.md#verification-status). The rest of the table
-is still to do; bump the API minor version (1.2.0) with the next batch.
+**Status (milestone 2, integration API 1.1.0 + 1.2.0):** rows 1, 2 and 7 below are implemented (patches
+0007-0010), and 1.2.0 (patches 0011-0013) adds the `ModMessageService` bridge from section B with per-mod routing
+of client process replies. Milestone 2's local run (full Windows build, real Director, external mod) passed
+1.1.0; the bridge was verified by the cloud harness (real `SessionActor`/`MessageService` dispatch, separately
+compiled mods, synthetic client packets, both supported Imlight revisions) but **not** yet by a full Imlight
+build or a client session; see [integration/imlight/README.md](../integration/imlight/README.md#remaining-local-tests-windows-real-imcodec-inputs-and-client).
+The rest of the table is still to do; bump the API minor version (1.3.0) with the next batch.
 
 | Event / registry | Call site (pinned source) | Replaces Shuffle change |
 | --- | --- | --- |
@@ -39,8 +40,11 @@ Inventory every `internal` Imlight member the ported code uses (compile the port
 prefer (1) a public member on the event or a SpiralLoader-owned public wrapper in `Imlight.CoreLib.Modding`
 added by the patch series; fall back to (2) an `IgnoresAccessChecksTo("Imlight.CoreLib")` publicized
 reference, which must first be proven to work with a test mod in the verification harness.
-`MessageService` is the critical one: decide between making it public upstream (with the members it exposes)
-or a public `ModMessageServiceBase` defined inside CoreLib by the patch.
+`MessageService` was the critical one and is **done** (1.2.0): a public `ModMessageService` defined inside CoreLib
+by the patch series, hosted per session by an internal `MessageService`; see
+[mod-authoring.md](mod-authoring.md#hooks-added-in-120-mod-message-services-and-client-process-replies). It
+deliberately exposes only `SendToSocket`, `GetSocketAccount`, `StartClientProcess`, `SessionId`, `OwnerModId` and
+`OnSessionEnded`; extend it (for example with `GetActiveWizard` for the inspector) only when the port needs it.
 
 ### C. The port
 
@@ -66,15 +70,13 @@ Windows build with the Imcodec generator inputs, run the server with the port, a
 
 ## Recommended next steps
 
-1. **Local smoke test of 1.1.0 (Windows, needs Imcodec generator inputs and a client).** Build the patched
-   Imlight (`Setup-Imlight.ps1`), which also confirms the compile-unverified assumptions listed in the
-   integration README (`MSG_MESSAGE_PROCESS.JobID` is `uint`, generated messages are `IMessage`). Then run a
-   throwaway mod that, on `CharacterListSentEvent`, starts a trivial client Lua process, claims its job id and
-   logs the reply; check the log shows no `Failed to deserialize message process` and that cancelling in
-   `GameServerSelectingEvent` shows the client an error.
-2. **Section B before the port**: decide how a mod derives from `MessageService` (it is `internal`), because
-   the port's inspector service, menu reply handler and `RandomizerLevelRequirement` all need it. Prove the
-   chosen route with a test mod in the harness.
+1. **Local verification of 1.2.0 (Windows, needs Imcodec generator inputs and a client).** Work through
+   "Remaining local tests" in [integration/imlight/README.md](../integration/imlight/README.md#remaining-local-tests-windows-real-imcodec-inputs-and-client):
+   full build at both revisions, the bridge mod compiled against the real `Imlight.CoreLib.dll`, and a real client
+   round trip at character select and in game.
+2. **Rest of section B**: inventory the remaining internals the port uses (`NumericRequirement` for
+   `RandomizerLevelRequirement`, `IComponentFactory` for zone components) and add narrow public wrappers the same
+   way, each proven with a separately compiled mod in the harness.
 3. **Remaining hooks (section A)**, in the order the port needs them: `ZoneEntityTemplateResolvingEvent`,
    `NpcStatsInitializingEvent`, zone component contributions, `CombatSpellResolvingEvent`,
    `WorldTeleportListBuildingEvent`. The harness cannot compile the zone and combat files (deep generated-type
@@ -83,13 +85,13 @@ Windows build with the Imcodec generator inputs, run the server with the port, a
 ## Hand-off prompt for the next session
 
 > You are continuing SpiralLoader (read `CLAUDE.md`, then `docs/next-milestone.md` and `docs/audit.md`).
-> Milestone 2 added integration API 1.1.0 (`CharacterListSentEvent`, `GameServerSelectingEvent`,
-> `imlight:client_process_jobs`). Implement section B first: choose and prove, with a test mod in the
-> verification harness, how a separately compiled mod derives from Imlight's internal `MessageService`
-> (a public `ModMessageServiceBase` added by the patch series, or an `IgnoresAccessChecksTo` publicized
-> reference; prefer the former), without exposing more of Imlight than needed. Then add
+> Integration API 1.2.0 added the public `ModMessageService` bridge (patches 0011-0013): mods derive from it,
+> register it in `imlight:game_message_services` / `imlight:login_message_services`, and receive the client
+> process replies for job ids they claimed. The harness compiles Imlight's real `SessionActor` and
+> `MessageService` and drives them with separately compiled mods. First fold in the results of the local
+> verification listed in `integration/imlight/README.md` ("Remaining local tests"). Then add
 > `ZoneEntityTemplateResolvingEvent` and `NpcStatsInitializingEvent` as one commit each in the patch series
-> (follow "Changing the Imlight patch series" in `CLAUDE.md`, including `regen-patches.sh`, both verify
-> scripts for the pinned commit and `2a16010e59b95cc449d8e21542fbf38440e06bcf`, and the 1.2.0 version bump).
-> Be explicit about which call sites the harness compiled and which remain compile-unverified. Do not port
-> Spiral Shuffle code yet.
+> (follow "Changing the Imlight patch series" in `CLAUDE.md`, including `regen-patches.sh`, both verify scripts
+> for the pinned commit and `2a16010e59b95cc449d8e21542fbf38440e06bcf`, and the 1.3.0 version bump). Be explicit
+> about which call sites the harness compiled and which remain compile-unverified. Do not port Spiral Shuffle code
+> yet.

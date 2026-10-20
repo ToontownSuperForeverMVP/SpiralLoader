@@ -1,7 +1,7 @@
-From e6e718b6396dc90b649b852c7bbb87596642e878 Mon Sep 17 00:00:00 2001
+From e1f10024f01689959dfd1ea0f93604f0fa3b30cb Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 16:48:08 +0000
-Subject: [PATCH 09/10] feat: let mods claim client process job ids
+Subject: [PATCH 09/13] feat: let mods claim client process job ids
 
 Mods register the JobIDs of the client processes they start in
 imlight:client_process_jobs (unique across mods). MinigameService

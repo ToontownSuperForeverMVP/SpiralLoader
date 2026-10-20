@@ -1,7 +1,7 @@
-From 60aa38cc7f5f09ca34c2ba187c26d6c401014ff2 Mon Sep 17 00:00:00 2001
+From df2f21c409ac4255b19dd93c7ec10d38023cbc0d Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 05:26:14 +0000
-Subject: [PATCH 01/10] build: reference SpiralLoader from CoreLib and Director
+Subject: [PATCH 01/13] build: reference SpiralLoader from CoreLib and Director
 
 Adds src/SpiralLoader.props, which locates a SpiralLoader checkout (default:
 a sibling of this repository, override with -p:SpiralLoaderRoot=...).
