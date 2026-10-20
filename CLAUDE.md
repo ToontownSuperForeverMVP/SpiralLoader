@@ -23,7 +23,7 @@ put logic in `SpiralLoader.Imlight` where it can be tested.
 
 ```bash
 dotnet build SpiralLoader.sln          # also assembles artifacts/mods/*
-dotnet test SpiralLoader.sln           # 146 tests, ~5 s
+dotnet test SpiralLoader.sln           # 153 tests, ~5 s
 dotnet run --project src/SpiralLoader.Host -- --mods artifacts/mods --run "hello world" --plan-assets
 integration/imlight/verify/verify-patch.sh            # IMLIGHT_COMMIT=<sha> to test another Imlight commit
 pwsh integration/imlight/verify/Verify-Patch.ps1      # Windows twin
@@ -50,7 +50,9 @@ In the cloud container the SDK may not be on PATH: `export PATH=/root/.dotnet:$P
 - No assembly unloading. Contexts are non-collectible; changing mods requires restart.
 - Do not invent Imlight APIs. Check the pinned source (`setup-imlight.sh` gives you a checkout) before using a
   type or member, and check its visibility (`MessageService`, `IComponentFactory`, `CommandProtocol`,
-  `NumericRequirement` are internal).
+  `NumericRequirement` are internal). Mods get message services through the public `ModMessageService` (1.2.0).
+- The verify harness compiles Imlight's real `SessionActor`/`MessageService`; never reintroduce a stub of them
+  (a public stub `MessageService` once hid the fact that mods could not derive from the real one).
 
 ## Conventions
 
@@ -70,11 +72,16 @@ In the cloud container the SDK may not be on PATH: `export PATH=/root/.dotnet:$P
 
 1. `integration/imlight/setup-imlight.sh` (or a checkout at the pinned commit on branch `spiralloader`).
 2. Commit on top of the series (one concern per commit, conventional-commit subject).
-3. `git format-patch b07987168fcfa2d123a5d78df90ca0c76405e427..HEAD -o integration/imlight/patches/` (delete old
-   files first so numbering stays contiguous).
+3. `integration/imlight/regen-patches.sh` (deletes the old files and runs
+   `git format-patch b07987168fcfa2d123a5d78df90ca0c76405e427..HEAD -o integration/imlight/patches/`, so numbering
+   stays contiguous).
 4. Run both verify scripts for the pinned commit **and** `IMLIGHT_COMMIT=<upstream quality-assurance HEAD>`.
-5. Extend `verify/Stubs.cs` and the harness `.csproj` to compile any newly touched file that can compile
-   against stubs; update the verification table in `integration/imlight/README.md`.
+5. Extend `verify/Stubs.cs` / `ImcodecStubs.cs` and the harness `.csproj` to compile any newly touched file that
+   can compile against stubs, drive it in `verify/Scenarios.cs`, add the expected lines to
+   `verify/expected-output.txt` (shared by both verify scripts; `expected-output-<commit12>.txt` for
+   revision-specific lines, `expected-vanilla-output.txt` for the run with the client-process mods disabled, `!` =
+   must not appear), and update the verification table in
+   `integration/imlight/README.md`. Do not stub the file under test.
 6. Bump `ImlightModding.IntegrationApiVersion` (minor for additions, major for breaks) and document hooks in
    `docs/mod-authoring.md`.
 

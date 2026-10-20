@@ -160,6 +160,36 @@ public sealed class EventAndRegistryTests {
     }
 
     [Fact]
+    public void UniqueValueRegistriesRejectSecondClaimAcrossMods() {
+        var store = new RegistryStore();
+        var claims = new RegistryKey<uint>("test:claims");
+        var plain = new RegistryKey<uint>("test:plain");
+        store.Add(claims, value => value == 0 ? "zero is reserved" : null, uniqueValues: true);
+        store.Add(plain, validator: null);
+        var first = new ScopedRegistryProvider(store, "first-mod").Get(claims);
+        var second = new ScopedRegistryProvider(store, "second-mod").Get(claims);
+
+        first.Register("menu", 770101u);
+        second.Register("other", 770102u);
+
+        var duplicate = Assert.Throws<ArgumentException>(() => second.Register("menu", 770101u));
+        Assert.Contains("770101", duplicate.Message);
+        Assert.Contains("first-mod:menu", duplicate.Message);
+        Assert.Throws<ArgumentException>(() => first.Register("zero", 0u));
+        Assert.Equal(["first-mod:menu", "second-mod:other"], first.Entries.Select(e => e.Id));
+
+        // A mod that is rolled back gives its claims up.
+        Assert.Equal(1, store.RemoveOwner("first-mod"));
+        second.Register("menu", 770101u);
+
+        // Registries are not unique unless declared so.
+        var plainFirst = new ScopedRegistryProvider(store, "first-mod").Get(plain);
+        plainFirst.Register("a", 5u);
+        new ScopedRegistryProvider(store, "second-mod").Get(plain).Register("a", 5u);
+        Assert.Equal(2, plainFirst.Entries.Count);
+    }
+
+    [Fact]
     public void UnknownRegistryIsReported() {
         var provider = new ScopedRegistryProvider(new RegistryStore(), "mod");
         var key = new RegistryKey<string>("test:missing");

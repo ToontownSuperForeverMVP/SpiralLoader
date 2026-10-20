@@ -5,5 +5,5 @@
   "name": "Imlight Patch Verification",
   "entrypoints": { "server": ["ImlightVerifyMod.VerifyMod"] },
   "assemblies": ["ImlightVerifyMod.dll"],
-  "depends": { "spiralloader": ">=0.1.0", "imlight": "^1.0.0" }
+  "depends": { "spiralloader": ">=0.1.0", "imlight": "^1.1.0" }
 }

@@ -50,7 +50,7 @@ realm) → player database + admin account → (HEAD only: `LoginWarmup.Run()`, 
 
 | Mechanism | Discovery | Base type visibility | Usable from a separately compiled assembly? |
 | --- | --- | --- | --- |
-| Message services | Hard-coded `HashSet<Type>` in `GameServiceFactory` / `LoginServiceFactory` | `MessageService` is **internal** | No (needs a factory hook and access to an internal base) |
+| Message services | Hard-coded `HashSet<Type>` in `GameServiceFactory` / `LoginServiceFactory` | `MessageService` is **internal** | No (needs a factory hook and access to an internal base). **Patches 0003 + 0011/0012** add the factory hook and the public `ModMessageService` bridge |
 | Requirement handlers | `RequirementDispatcher` static ctor scans `AppDomain.CurrentDomain.GetAssemblies()` | `BaseRequirementHandler<T>` public | Yes, if the assembly is loaded before first use; first match wins, order unspecified |
 | Result handlers | `ResultDispatcher` static ctor, same scan | `BaseResultHandler<T>` public | Same as above |
 | Zone entity components | `ZoneEntityComponentRegistry` static ctor, same scan | `ZoneEntityComponent` public, `IComponentFactory` **internal** | No (the marker interface is internal) |
@@ -67,9 +67,27 @@ Hazards found:
 
 ### Differences between the pin and HEAD that matter to SpiralLoader
 
-Only `Program.cs` (thread-pool warm-up, `LoginWarmup`, explicit `StartListening`) and `Imlight.ini` (one new
-key) differ among the files the integration touches. The patch series applies to both without `--3way`, and
-the verification harness passes on both.
+Among the files the integration touches, upstream HEAD changed `Program.cs` (thread-pool warm-up, `LoginWarmup`,
+explicit `StartListening`), `Imlight.ini` (one new key), `CharacterService.cs` and `GameTransitionService.cs`
+(milestone 2 hooks). The patch series applies to both with `git am --3way` (which the setup scripts use) and the
+verification harness passes on both. Behaviour differences the hooks tolerate:
+
+- `CharacterService` at HEAD no longer has the "unknown account" error path (`GetSocketAccount` throws) and skips a
+  character it cannot serialize instead of aborting the list, so `CharacterListSentEvent` fires after a partial
+  list there; at the pin it does not fire when serialization of any character fails.
+- `GameTransitionService.GetGameServer` at HEAD returns null on timeout and the handler answers with
+  `NoZonesAvailable`. The `GameServerSelectingEvent` patch consists of pure insertions around that code, so it
+  does not conflict with the upstream rewrite and a mod's chosen realm bypasses `GetGameServer` once.
+- `SendErrorToSocket` at HEAD no longer closes the session; a veto or unknown realm still sends
+  `MSG_CHARACTERSELECTED { Error = 1 }`. At the pin it calls `CloseSession()`, so the same veto closes the session
+  there (correction to the milestone 2 wording, which said the session always closes; the harness now asserts
+  both).
+- `SessionActor`'s supervisor (`AllForOneStrategy`) answers an unknown service exception with `Stop` at the pin
+  (every service of the session stops) and `Resume` at HEAD. The mod service host catches mod exceptions itself,
+  so mod faults behave the same on both.
+- `SessionActor.Dispose` (both revisions) waits for every service's `MSG_PREDISPOSE` reply, then tells
+  `MSG_DISPOSE` and stops itself, which stops its children; a child can be stopped before it processes
+  `MSG_DISPOSE`. Observed in the harness; `ModMessageService.OnSessionEnded` therefore runs at pre-dispose.
 
 ## 2. Spiral Shuffle
 
@@ -105,18 +123,26 @@ and 770102 (enemy inspector).
 
 ### Patch inventory and how each maps onto SpiralLoader
 
+Milestone 2 (integration API 1.1.0) read these call sites in the pinned source: `CharacterService.ReceiveRequestCharacterList`
+(the final `MSG_CHARACTERLIST` is the last statement; the error and serialization-failure paths return earlier),
+`GameTransitionService.ReceiveSelectCharacter` (`GetGameServer()` asks the login server for `MSG_GETBESTSERVER`;
+`MSG_QUERYREALMSERVER` is already served by `GameServerPool` and answers `RealmName = null` for an unknown
+realm), and `MinigameService.ReceiveMessageProcess` (never looks at `JobID` before decoding, and would
+dereference a null `_minigameJob` for a player who is not in a minigame). `ProcessSupervisor.GenerateProcessId`
+draws random ids in `[1, int.MaxValue)`, which can collide with a mod's claimed id, so it skips claimed ids.
+
 "Implemented" means available after this milestone's Imlight patches. "Planned" items are specified in
 [next-milestone.md](next-milestone.md).
 
 | Spiral Shuffle change | Purpose | SpiralLoader mechanism | Status |
 | --- | --- | --- | --- |
-| `GameServiceFactory`: add `EnemyInspectorService` | new per-session service | `ImlightRegistries.GameMessageServices` | Implemented (needs access to internal `MessageService`, below) |
-| `CharacterService`: new `MSG_MESSAGE_PROCESS` handler for the menu choice | handle client Lua reply on login | `ImlightRegistries.LoginMessageServices` (a mod service receives the fanned-out packet) | Implemented (same caveat) |
+| `GameServiceFactory`: add `EnemyInspectorService` | new per-session service | `ModMessageService` in `ImlightRegistries.GameMessageServices` | Implemented (API 1.2.0; harness-verified, see integration README) |
+| `CharacterService`: new `MSG_MESSAGE_PROCESS` handler for the menu choice | handle client Lua reply on login | `ModMessageService` in `ImlightRegistries.LoginMessageServices`; replies for the mod's claimed job id are routed only to that mod | Implemented (API 1.2.0; harness-verified with a synthetic reply, no real client) |
 | `LootGranter`: `RandomizeLoot` before granting | change drops and gold | `LootGrantingEvent` | Implemented |
 | Copy `RandomizerLevelRequirement` (`ReqMagicLevel` handler) | requirement Imlight lacks | Existing AppDomain scan of `BaseRequirementHandler<T>` (mod assemblies load before the scan) | Works in principle; uses internal `NumericRequirement`; unverified without a full build |
-| `MinigameService`: ignore the inspector's job id | avoid fan-out collision | Client-process job id registry | Planned |
-| `CharacterService`: after `MSG_CHARACTERLIST`, start `Randomizer/Menu{mode}.lua` | open mod UI at character select | `CharacterListSentEvent` with a send-to-client helper | Planned |
-| `GameTransitionService`: pick realm by mode | route players to a realm | Cancellable `GameServerSelectingEvent` | Planned |
+| `MinigameService`: ignore the inspector's job id | avoid fan-out collision | `ImlightRegistries.ClientProcessJobs` (+ `ProcessSupervisor` never allocates claimed ids) | Implemented (API 1.1.0; compile-unverified call sites, see integration README) |
+| `CharacterService`: after `MSG_CHARACTERLIST`, start `Randomizer/Menu{mode}.lua` | open mod UI at character select | `CharacterListSentEvent` with `Send(IMessage)` | Implemented (API 1.1.0) |
+| `GameTransitionService`: pick realm by mode | route players to a realm | Cancellable `GameServerSelectingEvent` (`RealmName` -> `MSG_QUERYREALMSERVER`, the lookup Shuffle uses) | Implemented (API 1.1.0) |
 | `ZoneEntity` (2): swap creature template and client template id | creature shuffle | `ZoneEntityTemplateResolvingEvent` | Planned |
 | `NpcComponent` (3): roll and apply creature stats | creature stat randomization | `NpcStatsInitializingEvent` | Planned |
 | `CombatDuelComponent`: handle `EnemyInspectorQuery` | inspector data from the duel | Zone component contributions | Planned |
@@ -133,8 +159,12 @@ and 770102 (enemy inspector).
 
 Spiral Shuffle is compiled *into* `Imlight.CoreLib`, so it freely uses `internal` members. Verified examples:
 `MessageService`, `NumericRequirement`, `IComponentFactory`, and its own `internal` classes calling into
-Imlight's. A separately compiled mod cannot see internal members. The full list a port needs is part of the
-next milestone. Options, in order of preference:
+Imlight's. A separately compiled mod cannot see internal members. The milestone 2 local run confirmed this for
+`MessageService` (a mod deriving from it does not compile against the real `Imlight.CoreLib`); the cloud harness
+had hidden it with a public stub. **Resolved for message services by option 1:** patches 0011/0012 add the public
+`ModMessageService` bridge, and the harness now compiles the real, internal `MessageService`. The rest of the list
+a port needs (`NumericRequirement`, `IComponentFactory`, …) is part of the next milestone. Options, in order of
+preference:
 
 1. Make the specific members a mod needs public in Imlight (upstream change), or expose them through
    SpiralLoader-owned public wrappers added by the patch series.
@@ -149,7 +179,7 @@ Mods that touch internals should pin `compatibility.imlightCommits`.
 - Imlight has no semantic version; identity is the git commit. The patched Director stamps it into
   assembly metadata (`ImlightCommit`) at build time.
 - SpiralLoader exposes `imlight` as a built-in dependency whose version is
-  `ImlightModding.IntegrationApiVersion` (currently `1.0.0`): the version of the hook surface, not of Imlight.
+  `ImlightModding.IntegrationApiVersion` (currently `1.2.0`): the version of the hook surface, not of Imlight.
 - Wizard101 client data must match the server's `GameRevision`. Spiral Shuffle requires
   `r806919.Wizard_1_610`; mods declare this in `compatibility.clientRevisions`.
 - .NET 10 SDK everywhere (Imcodec's `global.json` asks for `10.0.0`, `rollForward: latestMinor`).

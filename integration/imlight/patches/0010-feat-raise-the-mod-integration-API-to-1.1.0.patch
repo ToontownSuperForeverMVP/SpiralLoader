@@ -1,0 +1,31 @@
+From be96844421e04c810dcd12054256597e6ddffd86 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 16:48:09 +0000
+Subject: [PATCH 10/13] feat: raise the mod integration API to 1.1.0
+
+Adds CharacterListSentEvent, GameServerSelectingEvent and the
+imlight:client_process_jobs registry. Mods that need them depend on
+imlight ^1.1.0.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: [AI session link removed]
+---
+ src/Imlight.CoreLib/Modding/ImlightModding.cs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/Imlight.CoreLib/Modding/ImlightModding.cs b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+index c6863b84..1828162f 100644
+--- a/src/Imlight.CoreLib/Modding/ImlightModding.cs
++++ b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+@@ -62,7 +62,7 @@ public static class ImlightModding {
+     /// Version of Imlight's mod-facing surface (events, registries, behaviors). Exposed to mods as the
+     /// <c>imlight</c> dependency. Bump the major version on breaking changes to any of it.
+     /// </summary>
+-    public const string IntegrationApiVersion = "1.0.0";
++    public const string IntegrationApiVersion = "1.1.0";
+ 
+     private const string NoPermissionReply = "You do not have permission to use this command.";
+ 
+-- 
+2.43.0
+

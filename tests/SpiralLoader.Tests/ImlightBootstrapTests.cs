@@ -110,6 +110,33 @@ public sealed class ImlightBootstrapTests {
         Assert.True(host.Registries.TryGet(CommonRegistries.Commands, out _));
     }
 
+    // 1.1.0 added the milestone 2 hooks; 1.2.0 added ModMessageService and client process reply routing.
+    [Theory]
+    [InlineData("^1.1.0", "1.0.0", false)]
+    [InlineData("^1.1.0", "1.1.0", true)]
+    [InlineData("^1.1.0", "1.2.0", true)]
+    [InlineData("^1.2.0", "1.1.0", false)]
+    [InlineData("^1.2.0", "1.2.0", true)]
+    public void ModsCanRequireHooksAddedInMinorIntegrationVersions(string requirement, string integrationVersion, bool loads) {
+        using var workspace = new ModWorkspace();
+        workspace.AddDataMod("needs-hooks", extra: new() {
+            ["depends"] = new Dictionary<string, string> { ["imlight"] = requirement },
+        });
+        var options = new ImlightLoaderOptions {
+            BaseDirectory = Path.GetDirectoryName(workspace.ModsDirectory)!,
+            Settings = new Dictionary<string, string> { ["FailurePolicy"] = "Continue" },
+            IntegrationApiVersion = integrationVersion,
+            Log = (_, _, _, _) => { },
+            RegisterProcessExit = false,
+        };
+
+        var host = ImlightModLoader.Start(options)!;
+
+        var mod = host.Report!.Find("needs-hooks")!;
+        Assert.Equal(loads ? ModState.Initialized : ModState.Rejected, mod.State);
+        Assert.Equal(!loads, mod.Diagnostics.Any(d => d.Code == DiagnosticCodes.DependencyVersionMismatch));
+    }
+
     [Fact]
     public void AbortPolicyPropagatesLoadFailure() {
         using var workspace = new ModWorkspace();

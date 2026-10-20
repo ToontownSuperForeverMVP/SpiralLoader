@@ -1,0 +1,20 @@
+VERIFY: event ServerStarted
+VERIFY: login services=6 extra=[]
+VERIFY: game Centaur services=28 extra=[]
+VERIFY: scenario visibility MessageService.public=False ModMessageService.public=True
+VERIFY: scenario claims 770101=False 770102=False 770201=False 770301=False 424242=False
+VERIFY: scenario character-list menu-user socket=[MSG_STARTCHARACTERLIST,MSG_CHARACTERINFO,MSG_CHARACTERLIST(error=0)]
+VERIFY: scenario menu-reply menu-user socket-after=[]
+VERIFY: scenario close menu-user closed=True
+VERIFY: scenario game-replies socket=[]
+VERIFY: scenario game-replies minigame-decoded=[inspect:42,isolation:ping,rolled-back,unclaimed,boom,after-fault]
+VERIFY: scenario close game-user closed=True
+VERIFY: scenarios done
+!added message service
+!ModMessageServiceHost
+!session ended
+!VERIFY: client-process-verify
+!VERIFY: isolation-verify
+!VERIFY: duplicate-claim-verify
+!VERIFY: scenario FAILED
+!threw unknown exception

@@ -1,7 +1,7 @@
-From 1237b2bafe4da23af01c0356486ccac2f2d291f3 Mon Sep 17 00:00:00 2001
+From 648aa81310f5c3c0d0363f503527d7acc096e561 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 05:26:14 +0000
-Subject: [PATCH 6/6] fix: tolerate unloadable types when scanning assemblies
+Subject: [PATCH 06/13] fix: tolerate unloadable types when scanning assemblies
 
 The requirement, result and zone component registries scan every loaded
 assembly. One assembly with an unresolvable reference (for example a

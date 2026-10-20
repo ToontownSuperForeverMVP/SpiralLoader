@@ -1,7 +1,7 @@
-From 248391b8bf2514e9bd054b5a2a5a6016123316da Mon Sep 17 00:00:00 2001
+From c9911efb407c1cbbed980cb0265846b86c0053cd Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 05:26:14 +0000
-Subject: [PATCH 2/6] feat: load SpiralLoader mods at startup
+Subject: [PATCH 02/13] feat: load SpiralLoader mods at startup
 
 The Director starts the mod loader right after configuration, before the
 actor system, resources, or any server exist, then publishes lifecycle

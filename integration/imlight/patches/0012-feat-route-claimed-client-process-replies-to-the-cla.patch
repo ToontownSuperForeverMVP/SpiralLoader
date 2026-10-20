@@ -1,0 +1,186 @@
+From 75b98cac777b4f19b12165c8ef1232f9e33034c1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 20 Oct 2026 00:21:12 +0000
+Subject: [PATCH 12/13] feat: route claimed client process replies to the
+ claiming mod
+
+MSG_MESSAGE_PROCESS and MSG_CLIENT_PROCESS_TERMINATED carry a job id.
+The mod service host now delivers them only to the services of the mod
+that claimed that id in imlight:client_process_jobs; a reply for an
+unclaimed id reaches no mod service and stays with MinigameService, as
+before. ModMessageService.StartClientProcess sends
+MSG_START_CLIENT_PROCESS for an id the service's own mod claimed and
+refuses any other id.
+
+The claimed-id set becomes an id -> owner table (same lazy, lock-free
+build once registrations are closed).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: [AI session link removed]
+---
+ src/Imlight.CoreLib/Modding/ImlightModding.cs | 32 +++++++++----
+ .../Modding/ModMessageService.cs              | 47 ++++++++++++++++++-
+ 2 files changed, 67 insertions(+), 12 deletions(-)
+
+diff --git a/src/Imlight.CoreLib/Modding/ImlightModding.cs b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+index baf70a6a..0b67f882 100644
+--- a/src/Imlight.CoreLib/Modding/ImlightModding.cs
++++ b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+@@ -68,7 +68,7 @@ public static class ImlightModding {
+ 
+     private static readonly object s_attachLock = new();
+     private static Dictionary<string, RegistryEntry<ModCommand>> s_commands;
+-    private static HashSet<uint> s_claimedJobs;
++    private static Dictionary<uint, string> s_jobOwners;
+ 
+     /// <summary>The mod event bus, or an inert bus when no loader is attached.</summary>
+     public static IEventBus Events { get; private set; } = NullEventBus.Instance;
+@@ -138,9 +138,19 @@ public static class ImlightModding {
+     /// Imlight's own client process handling (minigames) ignores claimed ids, and never allocates them.
+     /// </summary>
+     public static bool IsClientProcessJobClaimed(uint jobId) {
+-        var claimed = Volatile.Read(ref s_claimedJobs) ?? BuildClaimedJobs();
++        var owners = Volatile.Read(ref s_jobOwners) ?? BuildJobOwners();
+ 
+-        return claimed.Count != 0 && claimed.Contains(jobId);
++        return owners.Count != 0 && owners.ContainsKey(jobId);
++    }
++
++    /// <summary>
++    /// The id of the mod that claimed <paramref name="jobId"/> in <see cref="ImlightRegistries.ClientProcessJobs"/>,
++    /// or null when no mod did.
++    /// </summary>
++    internal static string GetClientProcessJobOwner(uint jobId) {
++        var owners = Volatile.Read(ref s_jobOwners) ?? BuildJobOwners();
++
++        return owners.Count != 0 && owners.TryGetValue(jobId, out var owner) ? owner : null;
+     }
+ 
+     /// <summary>
+@@ -214,18 +224,19 @@ public static class ImlightModding {
+         return true;
+     }
+ 
+-    private static HashSet<uint> BuildClaimedJobs() {
+-        // Registrations are closed by the time any session exists, so building the set once is safe.
+-        var claimed = new HashSet<uint>();
++    private static Dictionary<uint, string> BuildJobOwners() {
++        // Registrations are closed by the time any session exists, so building the table once is safe. The
++        // registry rejects a second claim of an id, so every id has one owner.
++        var owners = new Dictionary<uint, string>();
+         if (Registries.TryGet(ImlightRegistries.ClientProcessJobs, out var registry)) {
+             foreach (var entry in registry.Entries) {
+-                claimed.Add(entry.Value);
++                owners.TryAdd(entry.Value, entry.OwnerModId);
+             }
+         }
+ 
+-        _ = Interlocked.CompareExchange(ref s_claimedJobs, claimed, null);
++        _ = Interlocked.CompareExchange(ref s_jobOwners, owners, null);
+ 
+-        return Volatile.Read(ref s_claimedJobs);
++        return Volatile.Read(ref s_jobOwners);
+     }
+ 
+     private static Dictionary<string, RegistryEntry<ModCommand>> GetCommands() {
+@@ -270,7 +281,8 @@ public static class ImlightRegistries {
+     /// Client process job ids (<c>MSG_START_CLIENT_PROCESS.JobID</c>) a mod uses for its own client scripts. Claimed
+     /// ids are unique across mods (a second claim fails that mod's initialization) and cannot be zero. Imlight's
+     /// <c>MinigameService</c> ignores <c>MSG_MESSAGE_PROCESS</c> for claimed ids, and its process supervisor never
+-    /// allocates them, so the mod's own service receives the client's replies undisturbed.
++    /// allocates them. <c>MSG_MESSAGE_PROCESS</c> and <c>MSG_CLIENT_PROCESS_TERMINATED</c> for a claimed id reach only
++    /// the <see cref="ModMessageService"/>s of the mod that claimed it; for an unclaimed id they reach no mod service.
+     /// </summary>
+     public static RegistryKey<uint> ClientProcessJobs { get; } = new("imlight:client_process_jobs");
+ 
+diff --git a/src/Imlight.CoreLib/Modding/ModMessageService.cs b/src/Imlight.CoreLib/Modding/ModMessageService.cs
+index ad020fa4..2a5f06ad 100644
+--- a/src/Imlight.CoreLib/Modding/ModMessageService.cs
++++ b/src/Imlight.CoreLib/Modding/ModMessageService.cs
+@@ -36,7 +36,9 @@
+  * NOTE:
+  * Mod services are plain objects owned by the host actor: their handlers run synchronously inside the host's
+  * message processing, one message at a time, like any other service. An exception from a mod service is
+- * logged against its mod and does not stop the session or the other services.
++ * logged against its mod and does not stop the session or the other services. Client process traffic
++ * (MSG_MESSAGE_PROCESS, MSG_CLIENT_PROCESS_TERMINATED) reaches only the services of the mod that claimed the
++ * job id in ImlightRegistries.ClientProcessJobs.
+  *
+  * TODO:
+  *
+@@ -50,6 +52,7 @@ using System.Collections.Concurrent;
+ using System.Collections.Generic;
+ using System.Reflection;
+ using Imcodec.MessageLayer;
++using Imcodec.MessageLayer.Generated;
+ using Imlight.Common;
+ using Imlight.CoreLib.Shared.Networking;
+ using Imlight.CoreLib.WizardData.Models.Player;
+@@ -96,6 +99,26 @@ public abstract class ModMessageService {
+     /// </summary>
+     protected Account GetSocketAccount() => Host.GetAccount();
+ 
++    /// <summary>
++    /// Starts the client script <paramref name="scriptName"/> (for example <c>MyMod/Menu.lua</c>) as client process
++    /// <paramref name="jobId"/>. The id must be claimed by this service's mod in
++    /// <see cref="ImlightRegistries.ClientProcessJobs"/>; the client's replies then arrive as
++    /// <c>GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS</c> at this mod's services.
++    /// </summary>
++    /// <exception cref="InvalidOperationException">This mod did not claim <paramref name="jobId"/>.</exception>
++    protected void StartClientProcess(uint jobId, string scriptName) {
++        ArgumentException.ThrowIfNullOrEmpty(scriptName);
++
++        var owner = ImlightModding.GetClientProcessJobOwner(jobId);
++        if (owner != OwnerModId) {
++            throw new InvalidOperationException(owner is null
++                ? $"Client process job id {jobId} is not claimed by mod {OwnerModId}."
++                : $"Client process job id {jobId} belongs to mod {owner}, not {OwnerModId}.");
++        }
++
++        Host.SendToClient(new GAME_5_PROTOCOL.MSG_START_CLIENT_PROCESS { JobID = jobId, ScriptName = scriptName });
++    }
++
+     /// <summary>
+     /// Called once when the session ends, while the session's other services still run (Imlight's pre-dispose
+     /// step, which waits at most two seconds for all services). Release per-session state here; keep it short.
+@@ -175,9 +198,15 @@ internal abstract class ModMessageServiceHost : MessageService {
+             handled = true;
+         }
+ 
++        // Client process traffic belongs to the mod that claimed its job id; an unclaimed id is Imlight's own
++        // (minigames), so no mod service sees it.
++        var jobOwner = TryGetJobId(message, out var jobId)
++            ? ImlightModding.GetClientProcessJobOwner(jobId) ?? string.Empty
++            : null;
++
+         foreach (var (service, ownerModId) in _services) {
+             var handler = MessageHandlerTable.DispatcherFor(service.GetType(), messageType);
+-            if (handler is null) {
++            if (handler is null || (jobOwner is not null && jobOwner != ownerModId)) {
+                 continue;
+             }
+ 
+@@ -195,6 +224,20 @@ internal abstract class ModMessageServiceHost : MessageService {
+         }
+     }
+ 
++    private static bool TryGetJobId(object message, out uint jobId) {
++        switch (message) {
++            case GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS process:
++                jobId = process.JobID;
++                return true;
++            case GAME_5_PROTOCOL.MSG_CLIENT_PROCESS_TERMINATED terminated:
++                jobId = terminated.JobID;
++                return true;
++            default:
++                jobId = 0;
++                return false;
++        }
++    }
++
+     /// <summary>The registered mod service types of one host type, and the message types they handle.</summary>
+     private sealed class ServiceSet {
+ 
+-- 
+2.43.0
+

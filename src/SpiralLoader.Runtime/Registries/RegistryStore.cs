@@ -19,7 +19,7 @@ internal interface IOwnedRegistry {
 }
 
 /// <summary>A registry shared by every mod. Mods see it through <see cref="ScopedRegistry{T}"/>.</summary>
-internal sealed class Registry<T>(RegistryKey<T> key, RegistryValidator<T>? validator) : IOwnedRegistry where T : notnull {
+internal sealed class Registry<T>(RegistryKey<T> key, RegistryValidator<T>? validator, bool uniqueValues = false) : IOwnedRegistry where T : notnull {
 
     private readonly Lock _gate = new();
     private RegistryEntry<T>[] _entries = [];
@@ -53,6 +53,11 @@ internal sealed class Registry<T>(RegistryKey<T> key, RegistryValidator<T>? vali
                 throw new ArgumentException($"{Key.Name} already contains '{id}'.", nameof(name));
             }
 
+            if (uniqueValues && _entries.FirstOrDefault(entry => EqualityComparer<T>.Default.Equals(entry.Value, value)) is { } holder) {
+                throw new ArgumentException(
+                    $"{Key.Name} rejected '{id}': the value {value} is already held by '{holder.Id}'.", nameof(value));
+            }
+
             var entry = new RegistryEntry<T>(id, owner, value);
             Volatile.Write(ref _entries, [.. _entries, entry]);
             return entry;
@@ -82,9 +87,9 @@ internal sealed class RegistryStore {
     private readonly Dictionary<string, IOwnedRegistry> _registries = new(StringComparer.Ordinal);
     private readonly Lock _gate = new();
 
-    public void Add<T>(RegistryKey<T> key, RegistryValidator<T>? validator) where T : notnull {
+    public void Add<T>(RegistryKey<T> key, RegistryValidator<T>? validator, bool uniqueValues = false) where T : notnull {
         lock (_gate) {
-            if (!_registries.TryAdd(key.Name, new Registry<T>(key, validator))) {
+            if (!_registries.TryAdd(key.Name, new Registry<T>(key, validator, uniqueValues))) {
                 throw new InvalidOperationException($"Registry {key.Name} is already declared.");
             }
         }

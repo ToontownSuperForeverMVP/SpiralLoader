@@ -1,0 +1,44 @@
+SpiralLoader 0.1.0 starting (host: Imlight
+5 mod(s) found, 4 initialized, 1 failed.
+init.failed: DuplicateClaimVerifyMod.DuplicateClaimMod.Initialize threw ArgumentException: imlight:client_process_jobs rejected 'duplicate-claim-verify:stolen_menu': the value 770101 is already held by 'client-process-verify:menu'.
+[hello-spiral] Hello from Hello Spiral 1.0.0 on Imlight.
+VERIFY: event ServerStarting Imlight
+VERIFY: SpiralDB.Load
+VERIFY: event ServerResourcesLoaded
+Imlight may now be connected to.
+VERIFY: event ServerStarted
+Mod client-process-verify added message service ClientProcessVerifyMod.MenuReplyService (imlight:login_message_services)
+Mod isolation-verify added message service IsolationVerifyMod.IsolationLoginService (imlight:login_message_services)
+Mod client-process-verify added message service ClientProcessVerifyMod.InspectorService (imlight:game_message_services)
+Mod isolation-verify added message service IsolationVerifyMod.IsolationGameService (imlight:game_message_services)
+!duplicate-claim-verify added message service
+VERIFY: login services=7 extra=[Imlight.CoreLib.Modding.LoginModMessageServiceHost]
+VERIFY: game Centaur services=29 extra=[Imlight.CoreLib.Modding.GameModMessageServiceHost]
+VERIFY: scenario visibility MessageService.public=False ModMessageService.public=True
+VERIFY: scenario claims 770101=True 770102=True 770201=True 770301=False 424242=False
+VERIFY: event CharacterListSent menu-user
+VERIFY: scenario character-list menu-user socket=[MSG_STARTCHARACTERLIST,MSG_CHARACTERINFO,MSG_CHARACTERLIST(error=0),MSG_START_CLIENT_PROCESS(770101,Verify/Menu.lua)]
+VERIFY: client-process-verify login reply job=770101 account=menu-user message=menu:shuffle
+VERIFY: scenario menu-reply menu-user socket-after=[MSG_KILL_CLIENT_PROCESS(770101)]
+VERIFY: client-process-verify login session ended account=menu-user received=[770101:menu:shuffle]
+VERIFY: isolation-verify login session ended session=101 received=[]
+VERIFY: scenario close menu-user closed=True
+VERIFY: scenario character-list plain-user socket=[MSG_STARTCHARACTERLIST,MSG_CHARACTERINFO,MSG_CHARACTERLIST(error=0)]
+VERIFY: scenario select default-user server-asks=[MSG_GETBESTSERVER,MSG_PLAYERENQUEUED,MSG_CREATEKEY] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=0,port=12000)] closed-by-imlight=False
+VERIFY: scenario select route-user server-asks=[MSG_QUERYREALMSERVER(Shuffle),MSG_PLAYERENQUEUED,MSG_CREATEKEY] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=0,port=13000)] closed-by-imlight=False
+VERIFY: scenario select veto-user server-asks=[] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=1,port=0)]
+VERIFY: scenario select unknown-realm-user server-asks=[MSG_QUERYREALMSERVER(Nowhere)] socket=[MSG_CHARACTERSELECTED(prep=1,error=0,port=0),MSG_CHARACTERSELECTED(prep=0,error=1,port=0)]
+Message service IsolationVerifyMod.BrokenService of mod isolation-verify could not be created for session 107 and is disabled for it: System.InvalidOperationException: broken-service constructor fault on purpose
+VERIFY: isolation-verify refused: Client process job id 770101 belongs to mod client-process-verify, not isolation-verify.
+Message service IsolationVerifyMod.IsolationGameService of mod isolation-verify failed to handle MSG_MESSAGE_PROCESS: System.InvalidOperationException: isolation-verify handler fault on purpose
+VERIFY: scenario game-replies socket=[MSG_START_CLIENT_PROCESS(770102,Verify/InspectorResult.lua),MSG_START_CLIENT_PROCESS(770201,Isolation/Pong.lua)]
+VERIFY: scenario game-replies minigame-decoded=[rolled-back,unclaimed]
+VERIFY: client-process-verify game session ended account=game-user received=[770102:inspect:42,770102:after-fault,terminated:770102]
+VERIFY: isolation-verify game session ended account=game-user received=[770201:isolation:ping,770201:boom]
+VERIFY: scenario close game-user closed=True
+VERIFY: scenarios done
+!VERIFY: duplicate-claim-verify received
+!VERIFY: isolation-verify broken service received
+!VERIFY: isolation-verify started a process under a foreign job id
+!VERIFY: scenario FAILED
+!threw unknown exception

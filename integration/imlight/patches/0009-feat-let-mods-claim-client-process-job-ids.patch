@@ -1,0 +1,148 @@
+From e1f10024f01689959dfd1ea0f93604f0fa3b30cb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 19 Oct 2026 16:48:08 +0000
+Subject: [PATCH 09/13] feat: let mods claim client process job ids
+
+Mods register the JobIDs of the client processes they start in
+imlight:client_process_jobs (unique across mods). MinigameService
+ignores MSG_MESSAGE_PROCESS for claimed ids instead of decoding them as
+minigame traffic, and ProcessSupervisor never allocates a claimed id.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: [AI session link removed]
+---
+ .../Game/Processes/ProcessSupervisor.cs       |  3 +-
+ .../Game/Services/MinigameService.cs          |  6 +++
+ src/Imlight.CoreLib/Modding/ImlightModding.cs | 39 +++++++++++++++++++
+ src/Imlight.Director/Program.cs               |  1 +
+ 4 files changed, 48 insertions(+), 1 deletion(-)
+
+diff --git a/src/Imlight.CoreLib/Game/Processes/ProcessSupervisor.cs b/src/Imlight.CoreLib/Game/Processes/ProcessSupervisor.cs
+index 27ab5845..02dcba7e 100644
+--- a/src/Imlight.CoreLib/Game/Processes/ProcessSupervisor.cs
++++ b/src/Imlight.CoreLib/Game/Processes/ProcessSupervisor.cs
+@@ -43,6 +43,7 @@
+ 
+ using System.Collections.Generic;
+ using Akka.Actor;
++using Imlight.CoreLib.Modding;
+ using Imlight.CoreLib.Shared.Networking;
+ using Imlight.CoreLib.Shared.Packets;
+ 
+@@ -85,7 +86,7 @@ internal sealed class ProcessSupervisor : ReceiveProtocolDispatcher {
+ 
+         do {
+             processId = (uint)random.Next(1, int.MaxValue);
+-        } while (_processes.ContainsKey(processId));
++        } while (_processes.ContainsKey(processId) || ImlightModding.IsClientProcessJobClaimed(processId));
+ 
+         return processId;
+     }
+diff --git a/src/Imlight.CoreLib/Game/Services/MinigameService.cs b/src/Imlight.CoreLib/Game/Services/MinigameService.cs
+index 5745cb72..5bb4b630 100644
+--- a/src/Imlight.CoreLib/Game/Services/MinigameService.cs
++++ b/src/Imlight.CoreLib/Game/Services/MinigameService.cs
+@@ -44,6 +44,7 @@ using Imcodec.MessageLayer;
+ using Imcodec.MessageLayer.Generated;
+ using Imlight.Common;
+ using Imlight.CoreLib.Game.Minigames;
++using Imlight.CoreLib.Modding;
+ using Imlight.CoreLib.Shared.Networking;
+ using Imlight.CoreLib.Shared.Packets;
+ 
+@@ -120,6 +121,11 @@ internal class MinigameService(SessionActor sessionActor) : MessageService(sessi
+ 
+     [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS))]
+     private void ReceiveMessageProcess(GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS message) {
++        // Client processes started by mods are not minigames: their replies belong to the mod's own service.
++        if (ImlightModding.IsClientProcessJobClaimed(message.JobID)) {
++            return;
++        }
++
+         // The raw message is just like any other message sent by the client.
+         // However, it does not include the magic header or body.
+         // It immediately begins with the DML header, detailing the service ID, message ID, length, and finally the payload.
+diff --git a/src/Imlight.CoreLib/Modding/ImlightModding.cs b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+index b90ce33f..c6863b84 100644
+--- a/src/Imlight.CoreLib/Modding/ImlightModding.cs
++++ b/src/Imlight.CoreLib/Modding/ImlightModding.cs
+@@ -68,6 +68,7 @@ public static class ImlightModding {
+ 
+     private static readonly object s_attachLock = new();
+     private static Dictionary<string, RegistryEntry<ModCommand>> s_commands;
++    private static HashSet<uint> s_claimedJobs;
+ 
+     /// <summary>The mod event bus, or an inert bus when no loader is attached.</summary>
+     public static IEventBus Events { get; private set; } = NullEventBus.Instance;
+@@ -119,6 +120,22 @@ public static class ImlightModding {
+         return null;
+     }
+ 
++    /// <summary>
++    /// Validator for <see cref="ImlightRegistries.ClientProcessJobs"/>. Returns null when the id is usable.
++    /// </summary>
++    public static string ValidateClientProcessJob(uint jobId)
++        => jobId == 0 ? "job id 0 is reserved." : null;
++
++    /// <summary>
++    /// True when a mod claimed <paramref name="jobId"/> in <see cref="ImlightRegistries.ClientProcessJobs"/>.
++    /// Imlight's own client process handling (minigames) ignores claimed ids, and never allocates them.
++    /// </summary>
++    public static bool IsClientProcessJobClaimed(uint jobId) {
++        var claimed = Volatile.Read(ref s_claimedJobs) ?? BuildClaimedJobs();
++
++        return claimed.Count != 0 && claimed.Contains(jobId);
++    }
++
+     /// <summary>
+     /// Adds the message services mods registered under <paramref name="key"/> to a factory's built-in set.
+     /// </summary>
+@@ -168,6 +185,20 @@ public static class ImlightModding {
+         return true;
+     }
+ 
++    private static HashSet<uint> BuildClaimedJobs() {
++        // Registrations are closed by the time any session exists, so building the set once is safe.
++        var claimed = new HashSet<uint>();
++        if (Registries.TryGet(ImlightRegistries.ClientProcessJobs, out var registry)) {
++            foreach (var entry in registry.Entries) {
++                claimed.Add(entry.Value);
++            }
++        }
++
++        _ = Interlocked.CompareExchange(ref s_claimedJobs, claimed, null);
++
++        return Volatile.Read(ref s_claimedJobs);
++    }
++
+     private static Dictionary<string, RegistryEntry<ModCommand>> GetCommands() {
+         var commands = Volatile.Read(ref s_commands);
+         if (commands is not null) {
+@@ -205,4 +236,12 @@ public static class ImlightRegistries {
+     /// <summary>Extra message services attached to every login session.</summary>
+     public static RegistryKey<Type> LoginMessageServices { get; } = new("imlight:login_message_services");
+ 
++    /// <summary>
++    /// Client process job ids (<c>MSG_START_CLIENT_PROCESS.JobID</c>) a mod uses for its own client scripts. Claimed
++    /// ids are unique across mods (a second claim fails that mod's initialization) and cannot be zero. Imlight's
++    /// <c>MinigameService</c> ignores <c>MSG_MESSAGE_PROCESS</c> for claimed ids, and its process supervisor never
++    /// allocates them, so the mod's own service receives the client's replies undisturbed.
++    /// </summary>
++    public static RegistryKey<uint> ClientProcessJobs { get; } = new("imlight:client_process_jobs");
++
+ }
+diff --git a/src/Imlight.Director/Program.cs b/src/Imlight.Director/Program.cs
+index b0c6afb0..1edc05da 100644
+--- a/src/Imlight.Director/Program.cs
++++ b/src/Imlight.Director/Program.cs
+@@ -199,6 +199,7 @@ internal static class Program {
+                 DeclareRegistries = host => {
+                     host.AddRegistry(ImlightRegistries.GameMessageServices, ImlightModding.ValidateMessageService);
+                     host.AddRegistry(ImlightRegistries.LoginMessageServices, ImlightModding.ValidateMessageService);
++                    host.AddRegistry(ImlightRegistries.ClientProcessJobs, ImlightModding.ValidateClientProcessJob, uniqueValues: true);
+                     host.AddRegistry(SpiralLoader.Api.Commands.CommonRegistries.Commands,
+                         SpiralLoader.Runtime.ModCommandRouter.Validate);
+                 },
+-- 
+2.43.0
+

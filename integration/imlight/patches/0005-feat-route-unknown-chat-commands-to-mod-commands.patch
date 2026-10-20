@@ -1,7 +1,7 @@
-From d01daa9f8b57ae0588e1321f74e8d48cd8ad5e8d Mon Sep 17 00:00:00 2001
+From b8379bab5a1194bd943b5a1714f13d29eab86300 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 19 Oct 2026 05:26:14 +0000
-Subject: [PATCH 5/6] feat: route unknown chat commands to mod commands
+Subject: [PATCH 05/13] feat: route unknown chat commands to mod commands
 
 When no built-in command matches, the dispatcher tries commands mods
 registered in SpiralLoader's command registry. Built-in commands always

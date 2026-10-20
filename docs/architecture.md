@@ -107,17 +107,35 @@ Host-agnostic lifecycle events: `ModsLoadedEvent`, `ServerStartingEvent`, `Serve
 
 `IRegistry<T>` collects contributions the host consumes. Keys are `namespace:path`; entry ids are namespaced by
 the contributing mod (`modid:name`). The host declares registries before `Load()` and may attach a validator
-(for example "must derive from `MessageService` with a `SessionActor` constructor"); a rejected value throws in
+(for example "must derive from `ModMessageService` with a public parameterless constructor"); a rejected value throws in
 the mod's `Initialize`, which fails and rolls back that mod. Entries are ordered by mod load order, then
-registration order. Registries freeze with the bus.
+registration order. Registries freeze with the bus. A host may declare a registry with `uniqueValues: true`
+for claims (ids the host reserves): a value can then be registered once across all mods, and a duplicate
+throws in the second mod's `Initialize` (reported as `init.failed`, naming the entry that holds the value).
 
 Declared today:
 
 | Key | Value | Consumed by |
 | --- | --- | --- |
 | `spiralloader:commands` | `ModCommand` | Headless host `--run`; Imlight `CommandDispatcher` fallback |
-| `imlight:game_message_services` | `Type` | `GameServiceFactory` |
-| `imlight:login_message_services` | `Type` | `LoginServiceFactory` |
+| `imlight:game_message_services` | `Type` (`ModMessageService`) | `GameServiceFactory` → per-session `GameModMessageServiceHost` |
+| `imlight:login_message_services` | `Type` (`ModMessageService`) | `LoginServiceFactory` → per-session `LoginModMessageServiceHost` |
+| `imlight:client_process_jobs` | `uint` (unique, non-zero) | `MinigameService`, `ProcessSupervisor` via `ImlightModding.IsClientProcessJobClaimed`; the mod service hosts route replies to the claiming mod |
+
+### Mod message services (Imlight)
+
+Imlight's `MessageService` is `internal`, so a mod cannot derive from it. The patch series adds a public
+`ModMessageService` (a plain object, not an actor) and an internal `ModMessageServiceHost : MessageService`. When
+a factory's registry holds at least one `ModMessageService` type, the factory adds the host type once; each
+session then creates one host as an ordinary child of its `SessionActor`. The host publishes the union of the mod
+services' `[MessageHandler]` message types as its `MessageHandlers` (the only change to Imlight's dispatcher is a
+`protected` setter for that property), so `SessionActor`'s own dispatch table forwards those packets to it. The
+host creates the mod services, attaches them to the session, and calls their handlers through Imlight's own
+`MessageHandlerTable` on its actor thread. Client process messages (`MSG_MESSAGE_PROCESS`,
+`MSG_CLIENT_PROCESS_TERMINATED`) are delivered only to the services of the mod that claimed the job id. Mod
+constructor and handler exceptions are caught and logged against the owning mod, so they never reach the
+session's supervisor (whose strategy differs between Imlight revisions). `OnSessionEnded` runs in the host's
+pre-dispose step, the last point at which `SessionActor` reliably waits for its services.
 
 ## Manifest (`spiralmod.json`, schema 1)
 
