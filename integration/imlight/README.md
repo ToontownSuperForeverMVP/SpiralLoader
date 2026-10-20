@@ -61,31 +61,16 @@ assert the result. Everything below holds for both b0798716 and 2a16010e, with b
 | `ProcessSupervisor.cs` (skips claimed ids) | Compiled only (the id is random, so no scenario) |
 | `SERVER_100_PROTOCOL.cs`, `SERVICE_101_PROTOCOL.cs`, `PROCESS_107_PROTOCOL.cs`, `ServerInterfaces.cs` | Compiled (real, unmodified) so that dispatch and the server messages are the genuine ones |
 | Commit stamping targets in `Imlight.Director.csproj` | Exercised in isolation (git checkout, no git, explicit property) |
-| `LootGranter.cs`, `CommandDispatcher.cs`, `RequirementDispatcher.cs`, `ResultDispatcher.cs` edits | Reviewed only: these files need Imcodec generated types. Requires a full local build |
-| Generated-type assumptions in the 1.1.0/1.2.0 call sites | **Unverified here**: that `MSG_MESSAGE_PROCESS.JobID` and `MSG_CLIENT_PROCESS_TERMINATED.JobID` are `uint`, `MSG_MESSAGE_PROCESS.Message` a `string`, `MSG_START_CLIENT_PROCESS` has settable `JobID`/`ScriptName`, the generated messages are `IMessage`, and `Wizard`/`Account` members match the stubs. A full local build confirms them |
-| Whole `Imlight.CoreLib` / `Imlight.Director` build and a game client session | Not done in the cloud: needs the Imcodec generator inputs and Wizard101 data. No client Lua was executed |
+| `LootGranter.cs`, `CommandDispatcher.cs`, `RequirementDispatcher.cs`, `ResultDispatcher.cs` edits | Compiled by the full patched Release builds with real Imcodec generator inputs on both supported revisions |
+| Generated-type assumptions in the 1.1.0/1.2.0 call sites | Verified by full builds and a probe against each generated `Imcodec.MessageLayer.dll`: job ids are `uint`; `MSG_MESSAGE_PROCESS.Message` and `MSG_START_CLIENT_PROCESS.ScriptName` are `Imcodec.IO.ByteString` with working string conversions; start/kill fields are settable; all four process messages implement `IMessage`; the `Wizard`/`Account` call sites compile |
+| Whole `Imlight.CoreLib` / `Imlight.Director` build and isolated Director startup | Full patched Release builds passed on both revisions with real generator inputs. The pinned Director started with the separately compiled external mod and with SpiralLoader disabled; no Wizard101 client was launched |
+| Real client session | Not run: no separate safe client setup was available, so no client Lua or live reply round-trip was executed |
 
-## Remaining local tests (Windows, real Imcodec inputs and client)
+## Remaining client validation
 
-The cloud harness proves the server-side round trip with synthetic packets. These checks need a local machine and
-were **not** run here:
-
-1. **Full build at both revisions.** `Setup-Imlight.ps1` (and `-Commit 2a16010e59b95cc449d8e21542fbf38440e06bcf`), then
-   a Release build of `Imlight.Director` with the Imcodec generator inputs. Confirms the generated-type
-   assumptions above, in particular that `ModMessageService.cs` compiles against the real `GAME_5_PROTOCOL`.
-2. **Bridge mod against the real `Imlight.CoreLib.dll`.** Build `integration/imlight/verify/ClientProcessMod` (or
-   an equivalent mod) with `-p:ImlightDirectory=<built server>` instead of the harness reference; it must compile
-   without `IgnoresAccessChecksTo` or a publicizer and load with `"imlight": "^1.2.0"`.
-3. **Real client round trip at character select.** Install the mod, ship `Verify/Menu.lua` (a script that calls
-   `SendProcessMessage`) in the client's `Root.wad`, log in, and check the log for the mod's reply handler, no
-   `Failed to deserialize message process` from `MinigameService`, and the client closing the menu on
-   `MSG_KILL_CLIENT_PROCESS`.
-4. **Real client round trip in game.** A game-side `ModMessageService` starting a process with
-   `StartClientProcess` and receiving its reply; a minigame (for example Skull Riders) must still work alongside it.
-5. **Session lifetime.** Log out and disconnect at character select and in game; confirm `OnSessionEnded` runs once
-   per session and the session id is freed (no `SessionActor` left behind) on both revisions.
-6. **Veto behaviour per revision.** Cancel `GameServerSelectingEvent` with a real client. The harness shows the
-   server closing the session at b0798716 and keeping it open at 2a16010e; record what the client shows in each
-   case.
-7. **Vanilla regression.** Run with no `mods/` folder and with the mods listed in `DisabledMods`; minigames, login
-   and zone transfers behave exactly as unpatched Imlight.
+The full patched Release builds, external mod builds, generated-type probes, synthetic dispatch against the actual
+built CoreLib assemblies, isolated Director startup, and vanilla startup with SpiralLoader disabled were run locally
+for both supported revisions (except the Director launch, which used the pinned revision). A real Wizard101 client
+round trip remains unverified because no separate safe client setup was available. The installed client and its saves
+were not modified or launched. When a separate setup is available, validate character-select and in-game replies,
+session lifetime, and client-visible veto behavior there.
